@@ -1,8 +1,15 @@
+import time
+import random
 from neuralnet import NeuralNet
 
-NN = NeuralNet(4, 7)
+LAYERS = 4
+WIDTH = 7
+
+NN = NeuralNet(LAYERS, WIDTH)
 
 NN.visual_init()
 
 while(True):
-    pass
+    NN.read_inputs([random.random() for i in range(WIDTH)])
+    NN.compute()
+    time.sleep(1)
