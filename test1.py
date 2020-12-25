@@ -1,6 +1,6 @@
 from neuralnet import NeuralNet
 
-NN = NeuralNet(3, 3)
+NN = NeuralNet(4, 7)
 
 NN.visual_init()
 
