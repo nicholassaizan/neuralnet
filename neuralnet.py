@@ -3,116 +3,151 @@ import threading
 import numpy as np
 import random
 
+
 def get_init_weight(layer_id, layers):
     layer_multiplier = 1 - ((layer_id / layers)/3)
-    return random.random()/3 * layer_multiplier
+    return random.random() * layer_multiplier
+
 
 class Circle():
-    def __init__(self, screen, x, y, radius, layer_id, sub_id):
+    def __init__(self, screen, x, y, radius):
         self.screen = screen
         self.x = x
         self.y = y
         self.radius = radius
-        self.layer_id = layer_id
-        self.sub_id = sub_id
 
-    def get_value(self):
-        return nodes[self.layer_id][self.sub_id].output
-    
-    def draw(self):
-        value = self.get_value()
+    def draw(self, value):
         if (value > 0.5):
             color = (0, 255, 0)
         else:
             color = (255, 255, 255)
         pygame.draw.circle(self.screen, color, (self.x, self.y), self.radius)
 
-class Edge():
-    def __init__(self, screen, pos1, pos2, width, layer_id, sub_id):
+
+class Line():
+    def __init__(self, screen, pos1, pos2, width):
         self.screen = screen
         self.pos1 = pos1
         self.pos2 = pos2
         self.width = width
-        self.layer_id = layer_id
-        self.sub_id = sub_id
-    
-    def get_value(self):
-        return nodes[self.layer_id][self.sub_id].output
-    
-    def draw(self):
-        value = self.get_value()
-        if (value > 0.5):
-            color = (0, 255, 0)
-        else:
-            color = (100, 100, 100)
+
+    def draw(self, value):
+        r = (1 - value) * 100
+        g = 100 + (value * 155)
+        b = (1 - value) * 100
+        color = (r, g, b)
         pygame.draw.line(self.screen, color, self.pos1, self.pos2, self.width)
 
+
 class Input:
-    def __init__(self, layer_id, sub_id, weight):
-        self.layer_id = layer_id
-        self.sub_id = sub_id
+    def __init__(self, weight):
+        self.pre_weighted_value = 0
+        self.weighted_value = 0
         self.weight = weight
 
-    def compute(self):
-        return nodes[self.layer_id][self.sub_id].output * self.weight
+        self.visualization = None
 
-class Function:
-    def __init__(self):
-        self.inputs = []
-    
-    def add_input(self, layer_id, sub_id, weight):
-        self.inputs.append(Input(layer_id, sub_id, weight))
+    def compute(self, pre_weighted_value):
+        self.pre_weighted_value = pre_weighted_value
+        self.weighted_value = self.pre_weighted_value * self.weight
+        return self.weighted_value
 
-    def compute(self):
-        pre_total = sum([x.compute() for x in self.inputs])
-        total = 1/(1 + np.exp(50 * (-(pre_total - 0.5))))
-        print(f"pre_total: {pre_total}, total: {total}")
-        return total
 
 class Node:
-    def __init__(self, is_input = False):
-        self.is_input_layer = is_input
-        self.function = Function()
+    def __init__(self):
         self.output = 0
 
-    def add_input(self, layer_id, sub_id, weight):
-        self.function.add_input(layer_id, sub_id, weight)
+        self.visualization = None
 
-    def compute(self):
-        if (self.is_input_layer == False):
-            self.output = self.function.compute()
+    def compute(self, input_sum):
+        self.output = 1/(1 + np.exp(50 * (-(input_sum - 0.5))))
+        return self.output
+
 
 class NeuralNet:
-    def __init__(self, layers, width):
+    def __init__(self, layers, widths):
+        # Check inputs
+        if (layers < 2):
+            Exception("Must be atleast 2 layers")
+        if (len(widths) != layers):
+            Exception("widths must have a value for each layer")
+
+        # Copy dimensions
         self.layers = layers
-        self.width = width
+        self.widths = widths
+
+        # Declare nodes & inputs
         self.nodes = []
-        for l in range(layers):
+        self.inputs = []
+
+        # Initialize nodes & inputs
+        self.__init_nodes__()
+        self.__init_inputs__()
+
+        # Initialize misc variables
+        self.nn_input_args = [0 for x in range(widths[0])]
+
+    def __init_nodes__(self):
+        for layer in range(self.layers):
+            # add a new sub-array for this layer
             self.nodes.append([])
-            for w in range(width):
-                if (l == 0):
-                    is_input = True
-                else:
-                    is_input = False
-                self.nodes[l].append(Node(is_input))
-                print(f"Spawning Node ({l},{w})")
-                if (l == 0):
-                    # no connections needed for input layer
-                    pass
-                else:
-                    # connect all nodes from previous layer
-                    for w_in in range(width):
-                        print(f"Spawning Connections ({l-1},{w_in})->({l},{w})")
-                        self.nodes[l][w].function.add_input(l-1, w_in, get_init_weight(l, self.layers))
+
+            for n in range(self.widths[layer]):
+                # add a new node to this layer
+                self.nodes[layer].append(Node())
+
+    def __init_inputs__(self):
+        for layer in range(self.layers):
+            # add a new sub-array for this layer
+            self.inputs.append([])
+
+            curr_width = self.widths[layer]
+            for i in range(curr_width):
+                # add a new sub-array for outputs from this node
+                self.inputs[layer].append([])
+
+                if (layer == self.layers - 1):
+                    continue
+
+                next_width = self.widths[layer+1]
+                for j in range(next_width):
+                    weight = get_init_weight(layer, self.layers)
+                    self.inputs[layer][i].append(Input(weight))
 
     def read_inputs(self, inputs):
-        for w in range(self.width):
-            self.nodes[0][w].output = inputs[w]        
+        if (len(inputs) != self.widths[0]):
+            Exception("Inputs array len must match width of first layer")
+
+        self.nn_input_args = inputs
+
+    def get_input_sum(self, layer, layer_sub_id):
+        input_sum = 0
+
+        if (layer == 0):
+            input_sum = self.nn_input_args[layer_sub_id]
+
+        else:
+            for prev in range(self.widths[layer-1]):
+                input_sum += self.inputs[layer-1][prev][layer_sub_id].weighted_value
+
+        return input_sum
 
     def compute(self):
-        for l in range(1, self.layers):
-            for w in range(self.width):
-                self.nodes[l][w].compute()
+        for layer in range(self.layers):
+            for i in range(self.widths[layer]):
+                # get sum of inputs for this node
+                input_sum = self.get_input_sum(layer, i)
+
+                # compute the output of nodes in this layer
+                output = self.nodes[layer][i].compute(input_sum)  # TODO
+
+                # skip setting input values if this is the output layer
+                if (layer == self.layers-1):
+                    continue
+
+                for j in range(self.widths[layer+1]):
+                    # set the input values of outgoing connections
+                    self.inputs[layer][i][j].compute(output)
 
     def visual_init(self):
         # initialize pygame
@@ -124,10 +159,10 @@ class NeuralNet:
         self.screen_height = 9 * self.screen_scale
         self.screen = pygame.display.set_mode([self.screen_width, self.screen_height])
 
-        # setup nodes and edges visuals
-        self.nodes_init()
-        self.edges_init()
-        
+        # setup visuals
+        self.node_visual_init()
+        self.input_visual_init()
+
         # new thread for pygame
         thread = threading.Thread(target=self.pygame_thread)
         thread.start()
@@ -154,35 +189,49 @@ class NeuralNet:
         # Done! Time to quit.
         pygame.quit()
 
-    def visual_update(self):
-        for node_visual in self.node_visuals:
-            node_visual.draw()
-        for edge_visual in self.edge_visuals:
-            edge_visual.draw()
-
-    def nodes_init(self):
+    def node_visual_init(self):
         x_spacing = self.screen_width / (self.layers + 1)
-        y_spacing = self.screen_height / (self.width + 1)
-        node_radius = min(x_spacing,y_spacing) / 5
+        y_spacing = self.screen_height / (max(self.widths) + 1)
+        node_radius = min(x_spacing, y_spacing) / 5
 
-        self.node_visuals = []
-        self.edge_visuals = []
-
-        for x in range(self.layers):
-            for y in range(self.width):
+        for x in range(len(self.nodes)):
+            for y in range(len(self.nodes[x])):
+                # Calculate position of visual
                 x_pos = (x+1) * x_spacing
-                y_pos = (y+1) * y_spacing
-                print(f"Adding Node Visual ({x},{y})")
-                new_node_visual = Circle(self.screen, x_pos, y_pos, node_radius, x, y)
-                self.node_visuals.append(new_node_visual)
-                
-                # get relevant node
-                node = self.nodes[x][y]
-                for node_input in node.function.inputs:
-                    prev_x = node_input.layer_id
-                    prev_y = node_input.sub_id
-                    print(f"Adding Edge Visual ({prev_x},{prev_y})->({x},{y})")
-                    prev_x_pos = (prev_x+1) * x_spacing
-                    prev_y_pos = (prev_y+1) * y_spacing
-                    new_edge_visual = Edge(self.screen, (prev_x_pos+node_radius,prev_y_pos), (x_pos-node_radius,y_pos), 2, prev_x, prev_y)
-                    self.edge_visuals.append(new_edge_visual)
+                y_pos = (y+1) * y_spacing  # TODO need to modify this
+
+                # Instantiate visual
+                self.nodes[x][y].visualization = Circle(self.screen, x_pos, y_pos, node_radius)
+
+    def input_visual_init(self):
+        x_spacing = self.screen_width / (self.layers + 1)
+        y_spacing = self.screen_height / (max(self.widths) + 1)
+        node_radius = min(x_spacing, y_spacing) / 5
+
+        for i in range(len(self.inputs)):
+            for j in range(len(self.inputs[i])):
+                for k in range(len(self.inputs[i][j])):
+                    x1_pos = (i+1) * x_spacing + node_radius
+                    y1_pos = (j+1) * y_spacing
+                    x2_pos = ((i+1)+1) * x_spacing - node_radius
+                    y2_pos = (k+1) * y_spacing
+                    self.inputs[i][j][k].visualization = Line(self.screen, (x1_pos, y1_pos), (x2_pos, y2_pos), 2)
+
+    def node_visual_update(self):
+        for i in range(len(self.nodes)):
+            for j in range(len(self.nodes[i])):
+                if (self.nodes[i][j].visualization is not None):
+                    value = self.nodes[i][j].output
+                    self.nodes[i][j].visualization.draw(value)
+
+    def input_visual_update(self):
+        for i in range(len(self.inputs)):
+            for j in range(len(self.inputs[i])):
+                for k in range(len(self.inputs[i][j])):
+                    if (self.inputs[i][j][k].visualization is not None):
+                        value = self.inputs[i][j][k].weighted_value
+                        self.inputs[i][j][k].visualization.draw(value)
+
+    def visual_update(self):
+        self.node_visual_update()
+        self.input_visual_update()
