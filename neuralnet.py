@@ -189,32 +189,42 @@ class NeuralNet:
         # Done! Time to quit.
         pygame.quit()
 
-    def node_visual_init(self):
+    def get_visual_position(self, layer, layer_sub_id):
+        # Determine proper spacing
         x_spacing = self.screen_width / (self.layers + 1)
         y_spacing = self.screen_height / (max(self.widths) + 1)
+
+        # Determine node radius
         node_radius = min(x_spacing, y_spacing) / 5
 
+        # Determine x position
+        x_pos = (layer + 1) * x_spacing
+
+        # Determine y position
+        y_offset = (max(self.widths) - self.widths[layer]) * y_spacing / 2
+        y_pos = (layer_sub_id + 1) * y_spacing + y_offset
+
+        return (x_pos, y_pos, node_radius)
+
+    def node_visual_init(self):
         for x in range(len(self.nodes)):
             for y in range(len(self.nodes[x])):
-                # Calculate position of visual
-                x_pos = (x+1) * x_spacing
-                y_pos = (y+1) * y_spacing  # TODO need to modify this
+                # Get position of visual
+                x_pos, y_pos, node_radius = self.get_visual_position(x, y)
 
                 # Instantiate visual
                 self.nodes[x][y].visualization = Circle(self.screen, x_pos, y_pos, node_radius)
 
     def input_visual_init(self):
-        x_spacing = self.screen_width / (self.layers + 1)
-        y_spacing = self.screen_height / (max(self.widths) + 1)
-        node_radius = min(x_spacing, y_spacing) / 5
-
         for i in range(len(self.inputs)):
             for j in range(len(self.inputs[i])):
                 for k in range(len(self.inputs[i][j])):
-                    x1_pos = (i+1) * x_spacing + node_radius
-                    y1_pos = (j+1) * y_spacing
-                    x2_pos = ((i+1)+1) * x_spacing - node_radius
-                    y2_pos = (k+1) * y_spacing
+                    # Get first position of visual
+                    x1_pos, y1_pos, node_radius = self.get_visual_position(i, j)
+                    x1_pos += node_radius
+                    # Get second position of visual
+                    x2_pos, y2_pos, node_radius = self.get_visual_position(i+1, k)
+                    x2_pos -= node_radius
                     self.inputs[i][j][k].visualization = Line(self.screen, (x1_pos, y1_pos), (x2_pos, y2_pos), 2)
 
     def node_visual_update(self):

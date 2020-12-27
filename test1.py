@@ -3,7 +3,7 @@ import random
 from neuralnet import NeuralNet
 
 LAYERS = 4
-WIDTHS = (3, 7, 4, 2)
+WIDTHS = (3, 8, 5, 4)
 
 NN = NeuralNet(LAYERS, WIDTHS)
 
