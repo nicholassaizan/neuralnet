@@ -114,11 +114,18 @@ class NeuralNet:
                     weight = get_init_weight(layer, self.layers)
                     self.inputs[layer][i].append(Input(weight))
 
-    def read_inputs(self, inputs):
+    def set_inputs(self, inputs):
         if (len(inputs) != self.widths[0]):
             Exception("Inputs array len must match width of first layer")
 
         self.nn_input_args = inputs
+
+    def get_outputs(self):
+        values = []
+        for n in range(len(self.nodes[-1])):
+            values.append(self.nodes[-1][n].output)
+
+        return values
 
     def get_input_sum(self, layer, layer_sub_id):
         input_sum = 0
