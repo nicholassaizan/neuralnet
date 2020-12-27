@@ -3,9 +3,11 @@ import threading
 import numpy as np
 import random
 
+
 def get_init_weight(layer_id, layers):
     layer_multiplier = 1 - ((layer_id / layers)/3)
     return random.random()/3 * layer_multiplier
+
 
 class Circle():
     def __init__(self, screen, x, y, radius, layer_id, sub_id):
@@ -27,7 +29,8 @@ class Circle():
             color = (255, 255, 255)
         pygame.draw.circle(self.screen, color, (self.x, self.y), self.radius)
 
-class Edge():
+
+class Line():
     def __init__(self, screen, pos1, pos2, width, layer_id, sub_id):
         self.screen = screen
         self.pos1 = pos1
@@ -47,72 +50,115 @@ class Edge():
             color = (100, 100, 100)
         pygame.draw.line(self.screen, color, self.pos1, self.pos2, self.width)
 
+
 class Input:
-    def __init__(self, layer_id, sub_id, weight):
-        self.layer_id = layer_id
-        self.sub_id = sub_id
+    def __init__(self, weight):
+        self.pre_weighted_value = 0
+        self.weighted_value = 0
         self.weight = weight
 
-    def compute(self):
-        return nodes[self.layer_id][self.sub_id].output * self.weight
+    def compute(self, pre_weighted_value):
+        self.pre_weighted_value = pre_weighted_value
+        self.weighted_value = self.pre_weighted_value * self.weight
+        return self.weighted_value
 
-class Function:
-    def __init__(self):
-        self.inputs = []
-    
-    def add_input(self, layer_id, sub_id, weight):
-        self.inputs.append(Input(layer_id, sub_id, weight))
-
-    def compute(self):
-        pre_total = sum([x.compute() for x in self.inputs])
-        total = 1/(1 + np.exp(50 * (-(pre_total - 0.5))))
-        print(f"pre_total: {pre_total}, total: {total}")
-        return total
 
 class Node:
-    def __init__(self, is_input = False):
-        self.is_input_layer = is_input
-        self.function = Function()
+    def __init__(self):
         self.output = 0
 
-    def add_input(self, layer_id, sub_id, weight):
-        self.function.add_input(layer_id, sub_id, weight)
+    def compute(self, input_sum):
+        self.output = 1/(1 + np.exp(50 * (-(input_sum - 0.5))))
+        return self.output
 
-    def compute(self):
-        if (self.is_input_layer == False):
-            self.output = self.function.compute()
 
 class NeuralNet:
-    def __init__(self, layers, width):
+    def __init__(self, layers, widths):
+        # Check inputs
+        if (layers < 2):
+            Exception("Must be atleast 2 layers")
+        if (len(widths) != layers):
+            Exception("widths must have a value for each layer")
+
+        # Copy dimensions
         self.layers = layers
-        self.width = width
+        self.widths = widths
+
+        # Declare nodes & inputs
         self.nodes = []
-        for l in range(layers):
+        self.inputs = []
+
+        # Initialize nodes & inputs
+        self.__init_nodes__()
+        self.__init_inputs__()
+
+        # Initialize misc variables
+        self.nn_input_args = [0 for x in range(widths[0])]
+
+    def __init_nodes__(self):
+        for layer in range(self.layers):
+            # add a new sub-array for this layer
             self.nodes.append([])
-            for w in range(width):
-                if (l == 0):
-                    is_input = True
-                else:
-                    is_input = False
-                self.nodes[l].append(Node(is_input))
-                print(f"Spawning Node ({l},{w})")
-                if (l == 0):
-                    # no connections needed for input layer
-                    pass
-                else:
-                    # connect all nodes from previous layer
-                    for w_in in range(width):
-                        print(f"Spawning Connections ({l-1},{w_in})->({l},{w})")
-                        self.nodes[l][w].function.add_input(l-1, w_in, get_init_weight(l, self.layers))
+
+            # check if this is the input layer
+            if (layer == 0):
+                is_input_layer = True
+            else:
+                is_input_layer = False
+
+            for n in range(len(self.widths[layer])):
+                # add a new node to this layer
+                self.nodes[layer].append(Node(is_input_layer))
+
+    def __init_inputs__(self):
+        for layer in range(self.layers - 1):
+            # add a new sub-array for this layer
+            self.inputs.append([])
+
+            curr_width = self.widths[layer]
+            for i in range(curr_width):
+                # add a new sub-array for outputs from this node
+                self.inputs[layer].append([])
+
+                next_width = self.widths[layer]
+                for j in range(next_width):
+                    weight = get_init_weight(layer, self.layers)
+                    self.inputs[layer][i].append(Input(weight))
 
     def read_inputs(self, inputs):
-        for w in range(self.width):
-            self.nodes[0][w].output = inputs[w]        
+        if (len(inputs) != self.widths[0]):
+            Exception("Inputs array len must match width of first layer")
+
+        self.nn_input_args = inputs
+
+    def get_input_sum(self, layer, layer_sub_id):
+        input_sum = 0
+
+        if (layer == 0):
+            input_sum = self.nn_input_args[layer_sub_id]
+
+        else:
+            for prev in range(self.widths[layer-1]):
+                input_sum += self.inputs[layer][prev][layer_sub_id].weighted_value
+
+        return input_sum
 
     def compute(self):
-        for l in range(1, self.layers):
-            for w in range(self.width):
-                self.nodes[l][w].compute()
+        for layer in range(self.layers):
+            for i in range(self.widths[layer]):
+                # get sum of inputs for this node
+                input_sum = self.get_input_sum(layer, i)
+
+                # compute the output of nodes in this layer
+                output = self.nodes[layer][i].compute(input_sum)  # TODO
+
+                # skip setting input values if this is the output layer
+                if (layer == self.layers):
+                    continue
+
+                for j in range(self.widths[layer+1]):
+                    # set the input values of outgoing connections
+                    self.inputs[layer][i][j].compute(output)
 
     def visual_init(self):
         # initialize pygame
@@ -124,9 +170,9 @@ class NeuralNet:
         self.screen_height = 9 * self.screen_scale
         self.screen = pygame.display.set_mode([self.screen_width, self.screen_height])
 
-        # setup nodes and edges visuals
-        self.nodes_init()
-        self.edges_init()
+        # setup visuals
+        self.node_visuals_init()
+        self.input_visuals_init()
         
         # new thread for pygame
         thread = threading.Thread(target=self.pygame_thread)
@@ -162,11 +208,8 @@ class NeuralNet:
 
     def nodes_init(self):
         x_spacing = self.screen_width / (self.layers + 1)
-        y_spacing = self.screen_height / (self.width + 1)
+        y_spacing = self.screen_height / (max(self.widths) + 1)
         node_radius = min(x_spacing,y_spacing) / 5
-
-        self.node_visuals = []
-        self.edge_visuals = []
 
         for x in range(self.layers):
             for y in range(self.width):
