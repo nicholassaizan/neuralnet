@@ -149,23 +149,27 @@ class NeuralNet:
                     # set the input values of outgoing connections
                     self.inputs[layer][i][j].compute(output)
 
-    def visual_init(self):
+    def visual_init(self, screen):
         # initialize pygame
         pygame.init()
 
         # setup the drawing window
-        self.screen_scale = 100
-        self.screen_width = 16 * self.screen_scale
-        self.screen_height = 9 * self.screen_scale
-        self.screen = pygame.display.set_mode([self.screen_width, self.screen_height])
+        self.screen = screen
+        self.screen_width = screen.get_width()
+        self.screen_height = screen.get_height()
+        visual_scale = 5
+        self.visual_width = self.screen_width / visual_scale
+        self.visual_height = self.screen_height / visual_scale
+        self.visual_x_offset = self.screen_width - self.visual_width
+        self.visual_y_offset = self.screen_height - self.visual_height
 
         # setup visuals
         self.node_visual_init()
         self.input_visual_init()
 
         # new thread for pygame
-        thread = threading.Thread(target=self.pygame_thread)
-        thread.start()
+        # thread = threading.Thread(target=self.pygame_thread)
+        # thread.start()
 
     def pygame_thread(self):
         # Run until the user asks to quit
@@ -191,18 +195,18 @@ class NeuralNet:
 
     def get_visual_position(self, layer, layer_sub_id):
         # Determine proper spacing
-        x_spacing = self.screen_width / (self.layers + 1)
-        y_spacing = self.screen_height / (max(self.widths) + 1)
+        x_spacing = self.visual_width / (self.layers + 1)
+        y_spacing = self.visual_height / (max(self.widths) + 1)
 
         # Determine node radius
         node_radius = min(x_spacing, y_spacing) / 5
 
         # Determine x position
-        x_pos = (layer + 1) * x_spacing
+        x_pos = (layer + 1) * x_spacing + self.visual_x_offset
 
         # Determine y position
         y_offset = (max(self.widths) - self.widths[layer]) * y_spacing / 2
-        y_pos = (layer_sub_id + 1) * y_spacing + y_offset
+        y_pos = (layer_sub_id + 1) * y_spacing + y_offset + self.visual_y_offset
 
         return (x_pos, y_pos, node_radius)
 
