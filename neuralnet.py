@@ -1,5 +1,4 @@
 import pygame
-import threading
 import numpy as np
 import random
 
