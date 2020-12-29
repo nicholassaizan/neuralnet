@@ -1,15 +1,16 @@
 import time
 import random
 import pygame
-from neuralnet import NeuralNet
+from neuralnet import Pile
+from cars import Race
 
 # Set NN parameters
-LAYERS = 4
-WIDTHS = (3, 4, 4, 2)
+LAYERS = 3
+WIDTHS = (3, 4, 2)
 
 # Create NNs
-NN1 = NeuralNet(LAYERS, WIDTHS)
-NN2 = NeuralNet(LAYERS, WIDTHS)
+GROUP_SIZE = 6
+pile = Pile(GROUP_SIZE, LAYERS, WIDTHS)
 
 # Initialize pygame
 pygame.init()
@@ -23,38 +24,47 @@ screen_height = screen_scale * screen_height_scale
 screen = pygame.display.set_mode([screen_width, screen_height])
 
 # Initialize NN visuals
-NN1.visual_init(screen)
+pile.visual_init(screen)
 
 # Initialize application
-# TODO ...
+race = Race(screen, 6)
 
 fresh = True
+race_started = False
 
 # Run until the user asks to quit
 running = True
 while(running):
-    # Fill the background with white
+    # Fill the background with grey
     screen.fill((30, 30, 30))
 
-    # ...
-    # Do application stuff TODO
-    # ...
+    # Application update
     if (fresh is False):
-        pygame.draw.circle(screen, (255, 0, 0), (screen_width/3, screen_height/2), screen_scale/5 * a[0])
-        pygame.draw.circle(screen, (255, 0, 0), (screen_width/3*2, screen_height/2), screen_scale/5 * b[0])
+        # Let neural nets control cars
+        for i in range(len(race.cars)):
+            left, right = outputs[i][0], outputs[i][1]
+            race.cars[i].control(left, right)
+
+        # Start the cars
+        if (race_started is False):
+            race.start_race()
+            race_started = True
+
+        # Periodically start race
+        race.game_tick()
+        race.draw()
 
     # Process neural net inputs
-    NN1.set_inputs([random.random() for i in range(WIDTHS[0])])
-    NN2.set_inputs([random.random() for i in range(WIDTHS[0])])
-    NN1.compute()
-    NN2.compute()
-    out1 = NN1.get_outputs()
-    out2 = NN2.get_outputs()
+    pile.set_inputs([[random.random() for i in range(WIDTHS[0])]] * GROUP_SIZE)
+    pile.compute()
+    outputs = pile.get_outputs()
+
+    # Need to produce outputs before we can start controlling cars
     if (fresh is True):
         fresh = False
 
     # Update the NN visualization
-    NN1.visual_update()
+    pile.visual_update()
 
     # Flip the display
     pygame.display.flip()
@@ -65,7 +75,7 @@ while(running):
             running = False
 
     if running is True:
-        time.sleep(1)
+        time.sleep(0.125)
 
 # Done! Time to quit.
 pygame.quit()

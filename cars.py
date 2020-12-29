@@ -35,8 +35,8 @@ class Car():
         self.right_command = right
 
     def reset(self):
-        self.x = 0
-        self.y = 0
+        self.x = self.screen.get_width()/2 + 100 * random.random()
+        self.y = self.screen.get_height()/2
         self.vel = 0
         self.angle = 0
         self.odometer = 0
@@ -53,7 +53,7 @@ class Car():
         left = self.x - (vehicle_width/2)
         top = self.y - (vehicle_length/2)
         rect = pygame.Rect(left, top, vehicle_width, vehicle_length)
-        pygame.draw.rect(screen, self.color, rect)
+        pygame.draw.rect(self.screen, self.color, rect)
 
     def __get_rgb__(self, color):
         if (color == 'red'):
@@ -73,6 +73,37 @@ class Car():
         return rgb
 
 
+class TrackStraight():
+    def __init__(self, screen, pos1, pos2):
+        self.screen = screen
+        self.color = (100, 100, 100)
+        self.pos1 = pos1
+        self.pos2 = pos2
+        self.width = 50
+
+    def collision(self, pos):
+        return False
+
+    def draw(self):
+        pygame.draw.line(self.screen, self.color, self.pos1, self.pos2, self.width)
+
+
+class TrackTurn():
+    def __init__(self, screen, pos1, pos2, angle1, angle2):
+        self.screen = screen
+        self.color = (100, 100, 100)
+        self.rect = pygame.Rect(pos1[0], pos1[1], (pos2[0]-pos1[0]), (pos2[1]-pos1[1]))
+        self.start_angle = angle1
+        self.stop_angle = angle2
+        self.width = 50
+
+    def collision(self, pos):
+        return False
+
+    def draw(self):
+        pygame.draw.arc(self.screen, self.color, self.rect, self.start_angle, self.stop_angle, self.width)
+
+
 class Race():
     def __init__(self, screen, num_cars):
         self.screen = screen
@@ -88,8 +119,25 @@ class Race():
             cars.append(Car(self.screen, color))
         return cars
 
+    def __track_turns__(self):
+        turns = []
+        turns.append(TrackTurn(self.screen, (self.screen.get_width()/2 - 200, self.screen.get_height()/2 - 200), (self.screen.get_width()/2 + 200, self.screen.get_height()/2 + 200), -PI/2, PI/2))
+        return turns
+
+    def __track_straights__(self):
+        straights = []
+        return straights
+
     def __spawn_track__(self):
-        pass
+        track = []
+        track += self.__track_turns__()
+        track += self.__track_straights__()
+        return track
+
+    def collision(self, pos):
+        for part in self.track:
+            if (part.collision(pos) is True):
+                return True
 
     def start_race(self):
         for car in self.cars:
@@ -107,5 +155,7 @@ class Race():
             car.reset()
 
     def draw(self):
+        for part in self.track:
+            part.draw()
         for car in self.cars:
             car.draw()

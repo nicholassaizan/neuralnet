@@ -255,3 +255,29 @@ class NeuralNet:
     def visual_update(self):
         self.node_visual_update()
         self.input_visual_update()
+
+
+class Pile():
+    def __init__(self, num_nn, layers, widths):
+        self.nun_nn = num_nn
+        self.layers = layers
+        self.widths = widths
+        self.neural_nets = [NeuralNet(self.layers, self.widths) for i in range(num_nn)]
+
+    def visual_init(self, screen):
+        self.neural_nets[0].visual_init(screen)
+
+    def visual_update(self):
+        self.neural_nets[0].visual_update()
+
+    def set_inputs(self, inputs):
+        for i in range(len(self.neural_nets)):
+            self.neural_nets[i].set_inputs(inputs[i])
+
+    def compute(self):
+        for nn in self.neural_nets:
+            nn.compute()
+
+    def get_outputs(self):
+        outputs = [nn.get_outputs() for nn in self.neural_nets]
+        return outputs
