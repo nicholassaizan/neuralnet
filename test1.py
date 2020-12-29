@@ -70,18 +70,16 @@ while(running):
     new_gen = race.all_stopped()
     if (new_gen is True):
         # get best genes
-        # ...
+        fittest_car_index = race.get_fittest()
 
         # make mutations of best genes
-        # ...
+        pile.new_gen_from_fittest(fittest_car_index)
 
         # reset cars
         race.reset()
 
         # start cars
         race_started = False
-
-    
 
     # Need to produce outputs before we can start controlling cars
     if (fresh is True):

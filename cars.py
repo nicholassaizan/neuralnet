@@ -6,8 +6,8 @@ PI = math.pi
 
 MAX_ANGULAR_VEL = 2*PI / 30
 MAX_VEL = 100
-MAX_ACCEL = 2
-MAX_BRAKE = 3
+MAX_ACCEL = 3
+MAX_BRAKE = 2
 
 
 class Car():
@@ -297,6 +297,20 @@ class Race():
                 result = False
                 break
         return result
+
+    def get_fitness(self, index):
+        fitness = self.cars[index].odometer
+        return fitness
+
+    def get_fittest(self):
+        best_fitness = 0
+        best_index = 0
+        for i in range(len(self.cars)):
+            fitness = self.get_fitness(i)
+            if (fitness > best_fitness):
+                best_fitness = fitness
+                best_index = i
+        return best_index
 
     def reset(self):
         for car in self.cars:

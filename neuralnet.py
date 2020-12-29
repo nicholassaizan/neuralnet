@@ -285,3 +285,35 @@ class Pile():
     def get_outputs(self):
         outputs = [nn.get_outputs() for nn in self.neural_nets]
         return outputs
+
+    def pass_on_genes(self, index):
+        our_inputs = self.neural_nets[index].inputs
+        for i in range(len(self.neural_nets)):
+            # don't need to copy to the parent
+            if (i == index):
+                continue
+
+            # copy weights from parent to child
+            for layer in range(len(our_inputs)):
+                for layer_sub_id in range(len(our_inputs[layer])):
+                    for input_sub_id in range(len(our_inputs[layer][layer_sub_id])):
+                        self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight = our_inputs[layer][layer_sub_id][input_sub_id].weight
+
+    def mutate_children(self, index):
+        our_inputs = self.neural_nets[index].inputs
+        for i in range(len(self.neural_nets)):
+            # don't modify the parent
+            if (i == index):
+                continue
+
+            # random select a weight to modify
+            layer = random.choice(range(len(our_inputs) - 1))
+            layer_sub_id = random.choice(range(len(our_inputs[layer])))
+            input_sub_id = random.choice(range(len(our_inputs[layer][layer_sub_id])))
+
+            # add a mutation to the weight
+            self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight = random.random()
+
+    def new_gen_from_fittest(self, index):
+        self.pass_on_genes(index)
+        self.mutate_children(index)
