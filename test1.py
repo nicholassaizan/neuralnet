@@ -4,12 +4,24 @@ import pygame
 from neuralnet import Pile
 from cars import Race
 
+
+force = False
+
+
+def force_new_gen():
+    global force
+    if (force is True):
+        force = False
+        return True
+    return False
+
+
 # Set NN parameters
 LAYERS = 3
 WIDTHS = (5, 6, 4)
 
 # Create NNs
-GROUP_SIZE = 6
+GROUP_SIZE = 20
 pile = Pile(GROUP_SIZE, LAYERS, WIDTHS)
 
 # Initialize pygame
@@ -66,20 +78,21 @@ while(running):
     # Flip the display
     pygame.display.flip()
 
-    # Check if all cars are done or if next gen was forced
-    new_gen = race.all_stopped()
-    if (new_gen is True):
-        # get best genes
-        fittest_car_index = race.get_fittest()
+    if (fresh is False):
+        # Check if all cars are done or if next gen was forced
+        new_gen = (race.all_stopped() or force_new_gen())
+        if (new_gen is True):
+            # get best genes
+            fittest_car_index, distance_to_solution = race.get_fittest()
 
-        # make mutations of best genes
-        pile.new_gen_from_fittest(fittest_car_index)
+            # make mutations of best genes
+            pile.new_gen_from_fittest(fittest_car_index, distance_to_solution)
 
-        # reset cars
-        race.reset()
+            # reset cars
+            race.reset()
 
-        # start cars
-        race_started = False
+            # start cars
+            race_started = False
 
     # Need to produce outputs before we can start controlling cars
     if (fresh is True):
@@ -89,6 +102,9 @@ while(running):
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                force = True
 
     if running is True:
         time.sleep(0.01)

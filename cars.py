@@ -6,7 +6,7 @@ PI = math.pi
 
 MAX_ANGULAR_VEL = 2*PI / 30
 MAX_VEL = 100
-MAX_ACCEL = 3
+MAX_ACCEL = 2
 MAX_BRAKE = 2
 
 
@@ -38,6 +38,7 @@ class Car():
             self.angle %= (2 * PI)
 
     def tick(self):
+        self.ticks += 1
         self.rotate()
         self.translate()
         self.pedals()
@@ -57,6 +58,7 @@ class Car():
         self.brake = 0
         self.odometer = 0
         self.stopped = True
+        self.ticks = 0
 
     def start(self):
         self.stopped = False
@@ -299,7 +301,19 @@ class Race():
         return result
 
     def get_fitness(self, index):
-        fitness = self.cars[index].odometer
+        x1, y1, x2, y2 = 5000, 0, 6000, 0.5
+        distance = self.cars[index].odometer
+        average_speed = self.cars[index].odometer/self.cars[index].ticks
+        scaled_speed = distance / MAX_VEL * average_speed
+        if (distance < x1):
+            fitness = distance * (1 - y1) + scaled_speed * y1
+        elif ((distance >= x1) and (distance <= x2)):
+            m = (y2 - y1)/(x2 - x1)
+            b = (y2 - y1*x2/x1)/(1 - x2)
+            f = lambda x, m, b: m*x + b
+            fitness = distance * (1 - f(distance, m, b)) + scaled_speed * f(distance, m, b)
+        else:
+            fitness = distance * 0.5 + scaled_speed * 0.5
         return fitness
 
     def get_fittest(self):
@@ -310,7 +324,13 @@ class Race():
             if (fitness > best_fitness):
                 best_fitness = fitness
                 best_index = i
-        return best_index
+
+        distance_to_solution = self.get_distance_to_solution(best_index, best_fitness)
+        return best_index, distance_to_solution
+
+    def get_distance_to_solution(self, index, fitness):
+        dist = math.e**(-1 * fitness / 10000)
+        return dist
 
     def reset(self):
         for car in self.cars:

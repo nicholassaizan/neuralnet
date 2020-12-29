@@ -3,6 +3,20 @@ import numpy as np
 import random
 
 
+white = (255, 255, 255)
+
+
+def text_objects(text, font):
+    textSurface = font.render(text, True, white)
+    return textSurface, textSurface.get_rect()
+
+def message_display(screen, text, x, y):
+    largeText = pygame.font.Font('freesansbold.ttf',50)
+    TextSurf, TextRect = text_objects(text, largeText)
+    TextRect.center = ((x/2),(y/2))
+    screen.blit(TextSurf, TextRect)
+
+
 def get_init_weight(layer_id, layers):
     layer_multiplier = 1 - ((layer_id / layers)/3)
     return random.random() * layer_multiplier
@@ -263,18 +277,21 @@ class NeuralNet:
 
 class Pile():
     def __init__(self, num_nn, layers, widths):
+        self.gen_id = 0
         self.nun_nn = num_nn
         self.layers = layers
         self.widths = widths
         self.neural_nets = [NeuralNet(self.layers, self.widths) for i in range(num_nn)]
 
     def visual_init(self, screen, num_visuals):
+        self.screen = screen
         for visual_id in range(num_visuals):
-            self.neural_nets[visual_id].visual_init(screen, visual_id, num_visuals)
+            self.neural_nets[visual_id].visual_init(self.screen, visual_id, num_visuals)
 
     def visual_update(self):
         for neural_net in self.neural_nets:
             neural_net.visual_update()
+        message_display(self.screen, 'generation: ' + str(self.gen_id), self.screen.get_width()/2, 100)
 
     def set_inputs(self, inputs):
         for i in range(len(self.neural_nets)):
@@ -301,7 +318,7 @@ class Pile():
                     for input_sub_id in range(len(our_inputs[layer][layer_sub_id])):
                         self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight = our_inputs[layer][layer_sub_id][input_sub_id].weight
 
-    def mutate_children(self, index, distance_from_solution):
+    def mutate_children(self, index, distance_to_solution):
         our_inputs = self.neural_nets[index].inputs
         for i in range(len(self.neural_nets)):
             # don't modify the parent
@@ -309,15 +326,15 @@ class Pile():
                 continue
 
             # determine how probable mutations are based on number of inputs
-            num_mutations = self.neural_nets[index].num_inputs
+            num_mutations = self.neural_nets[index].num_inputs * 5
 
             # invoke mutations
             for n in range(num_mutations):
                 # determine if we mutate
-                if (random.random() <= distance_from_solution):
+                if (random.random() > distance_to_solution):
                     continue
 
-                delta = random.uniform(-0.2, 0.2)
+                delta = random.uniform(-0.1, 0.1)
 
                 # random select a weight to modify
                 layer = random.choice(range(len(our_inputs) - 1))
@@ -325,9 +342,12 @@ class Pile():
                 input_sub_id = random.choice(range(len(our_inputs[layer][layer_sub_id])))
 
                 # add a mutation to the weight
-                weight = self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight + delta
+                old_weight = self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight
+                weight = old_weight + delta
                 self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight = np.clip(weight, 0, 1)
 
-    def new_gen_from_fittest(self, index, distance_from_solution):
+        self.gen_id += 1
+
+    def new_gen_from_fittest(self, index, distance_to_solution):
         self.pass_on_genes(index)
-        self.mutate_children(index, distance_from_solution)
+        self.mutate_children(index, distance_to_solution)
