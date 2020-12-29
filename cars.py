@@ -4,8 +4,10 @@ import pygame
 
 PI = math.pi
 
-MAX_ANGULAR_VEL = 2*PI / 20
-MAX_VEL = 5
+MAX_ANGULAR_VEL = 2*PI / 30
+MAX_VEL = 100
+MAX_ACCEL = 2
+MAX_BRAKE = 2
 
 
 class Car():
@@ -15,38 +17,50 @@ class Car():
         self.reset()
         self.color = self.__get_rgb__(color)
 
+    def pedals(self):
+        self.vel += ((MAX_ACCEL * self.gas) - (MAX_BRAKE * self.brake))
+        if (self.vel > MAX_VEL):
+            self.vel = MAX_VEL
+
     def translate(self):
-        delta_x = self.vel * math.cos(self.angle)
-        delta_y = self.vel * math.sin(self.angle)
-        self.x += delta_x
-        self.y -= delta_y
-        self.odometer += self.vel
+        if (self.stopped is False):
+            delta_x = self.vel * math.cos(self.angle)
+            delta_y = self.vel * math.sin(self.angle)
+            self.x += delta_x
+            self.y -= delta_y
+            self.odometer += self.vel
 
     def rotate(self):
-        if (self.vel > 0):
+        if (self.stopped is False):
             self.angle += MAX_ANGULAR_VEL * (self.left_command - self.right_command)
             self.angle %= (2 * PI)
 
     def tick(self):
         self.rotate()
         self.translate()
+        self.pedals
 
-    def control(self, left, right):
+    def control(self, left, right, gas, brake):
         self.left_command = left
         self.right_command = right
+        self.gas = gas
+        self.brake = brake
 
     def reset(self):
         self.x = self.start_pos[0]
         self.y = self.start_pos[1]
         self.vel = 0
         self.angle = 0
+        self.gas = 0
+        self.brake = 0
         self.odometer = 0
+        self.stopped = True
 
     def start(self):
-        self.vel = MAX_VEL
+        self.stopped = False
 
     def stop(self):
-        self.vel = 0
+        self.stopped = True
 
     def draw(self):
         vehicle_width = 6
@@ -83,8 +97,12 @@ class TrackStraight():
         self.width = self.pos2[0] - self.pos1[0]
         self.height = self.pos2[1] - self.pos1[1]
 
-    def collision(self, pos):
-        return False
+    def on_track(self, pos):
+        result = True
+        x, y = pos[0], pos[1]
+        if ((x < self.pos1[0]) or (y < self.pos1[1]) or (x > self.pos2[0]) or (y > self.pos2[1])):
+            result = False
+        return result
 
     def draw(self):
         pygame.draw.rect(self.screen, self.color, (self.pos1[0], self.pos1[1], self.width, self.height))
@@ -102,6 +120,7 @@ class Track90Turn():
         self.width = outer_radius - inner_radius
 
     def __init_angles__(self, direction):
+        self.direction = direction
         if (direction == 'nw'):
             self.start_angle = PI/2
             self.stop_angle = PI
@@ -115,8 +134,25 @@ class Track90Turn():
             self.start_angle = 0
             self.stop_angle = PI/2
 
-    def collision(self, pos):
-        return False
+    def on_track(self, pos):
+        result = True
+        x, y = pos[0], pos[1]
+        dist = math.sqrt(math.pow((x-self.center[0]), 2) + math.pow((y-self.center[1]), 2))
+        if ((dist < self.inner_radius) or (dist > self.outer_radius)):
+            result = False
+        if (self.direction == 'nw'):
+            if ((x > self.center[0]) or (y > self.center[1])):
+                result = False
+        elif (self.direction == 'sw'):
+            if ((x > self.center[0]) or (y < self.center[1])):
+                result = False
+        elif (self.direction == 'se'):
+            if ((x < self.center[0]) or (y < self.center[1])):
+                result = False
+        else:
+            if ((x < self.center[0]) or (y > self.center[1])):
+                result = False
+        return result
 
     def draw(self):
         pygame.draw.arc(self.screen, self.color, self.rect, self.start_angle, self.stop_angle, self.width)
@@ -134,6 +170,7 @@ class Track180Turn():
         self.width = outer_radius - inner_radius
 
     def __init_angles__(self, direction):
+        self.direction = direction
         if (direction == 'n'):
             self.start_angle = 0
             self.stop_angle = PI
@@ -147,8 +184,25 @@ class Track180Turn():
             self.start_angle = -PI/2
             self.stop_angle = PI/2
 
-    def collision(self, pos):
-        return False
+    def on_track(self, pos):
+        result = True
+        x, y = pos[0], pos[1]
+        dist = math.sqrt(math.pow((x-self.center[0]), 2) + math.pow((y-self.center[1]), 2))
+        if ((dist < self.inner_radius) or (dist > self.outer_radius)):
+            result = False
+        if (self.direction == 'n'):
+            if (y > self.center[1]):
+                result = False
+        elif (self.direction == 'w'):
+            if (x > self.center[0]):
+                result = False
+        elif (self.direction == 's'):
+            if (y < self.center[1]):
+                result = False
+        else:
+            if (x < self.center[0]):
+                result = False
+        return result
 
     def draw(self):
         pygame.draw.arc(self.screen, self.color, self.rect, self.start_angle, self.stop_angle, self.width)
@@ -188,10 +242,10 @@ class Race():
         track += self.__track_straights__()
         return track
 
-    def collision(self, pos):
+    def on_track(self, pos):
         result = False
         for part in self.track:
-            if (part.collision(pos) is True):
+            if (part.on_track(pos) is True):
                 result = True
         return result
 
@@ -200,11 +254,45 @@ class Race():
             car.start()
 
     def game_tick(self):
+        sensor_readings = []
         for car in self.cars:
             car.tick()
             pos = (car.x, car.y)
-            if (self.collision(pos)):
+
+            sensor_left, sensor_middle, sensor_right = 0, 0, 0
+
+            if (self.on_track(pos) is False):
                 car.stop()
+            else:
+                sensor_left = self.sensor_processing(self.sense_distance(pos, car.angle + PI/4))
+                sensor_middle = self.sensor_processing(self.sense_distance(pos, car.angle))
+                sensor_right = self.sensor_processing(self.sense_distance(pos, car.angle - PI/4))
+
+            speed = car.vel / MAX_VEL
+            
+            sensor_readings.append([sensor_left, sensor_middle, sensor_right, speed])
+
+        return sensor_readings
+
+    def sensor_processing(self, readings):
+        return math.e**(-1 * readings / 100)
+
+    def sense_distance(self, pos, angle):
+        distance = 0
+        beam = [pos[0], pos[1]]
+        while (self.on_track(beam) is True):
+            beam[0] += MAX_VEL * math.cos(angle)
+            beam[1] -= MAX_VEL * math.sin(angle)
+            distance += MAX_VEL
+        return distance
+
+    def all_stopped(self):
+        result = True
+        for car in self.cars:
+            if (car.stopped is False):
+                result = False
+                break
+        return result
 
     def reset(self):
         for car in self.cars:

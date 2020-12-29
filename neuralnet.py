@@ -155,18 +155,20 @@ class NeuralNet:
                     # set the input values of outgoing connections
                     self.inputs[layer][i][j].compute(output)
 
-    def visual_init(self, screen):
+    def visual_init(self, screen, visual_id, num_visuals):
         # initialize pygame
         pygame.init()
+
+        self.visual_id = visual_id
+        self.num_visuals = num_visuals
 
         # setup the drawing window
         self.screen = screen
         self.screen_width = screen.get_width()
         self.screen_height = screen.get_height()
-        visual_scale = 5
-        self.visual_width = self.screen_width / visual_scale
-        self.visual_height = self.screen_height / visual_scale
-        self.visual_x_offset = self.screen_width - self.visual_width
+        self.visual_width = self.screen_width / self.num_visuals
+        self.visual_height = self.screen_height / self.num_visuals
+        self.visual_x_offset = self.visual_width * self.visual_id
         self.visual_y_offset = self.screen_height - self.visual_height
 
         # setup visuals
@@ -264,11 +266,13 @@ class Pile():
         self.widths = widths
         self.neural_nets = [NeuralNet(self.layers, self.widths) for i in range(num_nn)]
 
-    def visual_init(self, screen):
-        self.neural_nets[0].visual_init(screen)
+    def visual_init(self, screen, num_visuals):
+        for visual_id in range(num_visuals):
+            self.neural_nets[visual_id].visual_init(screen, visual_id, num_visuals)
 
     def visual_update(self):
-        self.neural_nets[0].visual_update()
+        for neural_net in self.neural_nets:
+            neural_net.visual_update()
 
     def set_inputs(self, inputs):
         for i in range(len(self.neural_nets)):

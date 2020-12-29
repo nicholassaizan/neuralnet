@@ -6,10 +6,10 @@ from cars import Race
 
 # Set NN parameters
 LAYERS = 3
-WIDTHS = (3, 4, 2)
+WIDTHS = (4, 5, 4)
 
 # Create NNs
-GROUP_SIZE = 6
+GROUP_SIZE = 5
 pile = Pile(GROUP_SIZE, LAYERS, WIDTHS)
 
 # Initialize pygame
@@ -24,10 +24,10 @@ screen_height = screen_scale * screen_height_scale
 screen = pygame.display.set_mode([screen_width, screen_height])
 
 # Initialize NN visuals
-pile.visual_init(screen)
+pile.visual_init(screen, GROUP_SIZE)
 
 # Initialize application
-race = Race(screen, 6)
+race = Race(screen, GROUP_SIZE)
 
 fresh = True
 race_started = False
@@ -39,29 +39,26 @@ while(running):
     screen.fill((30, 30, 30))
 
     # Application update
+    sensor_readings = [[0, 0, 0, 0]] * GROUP_SIZE
     if (fresh is False):
         # Let neural nets control cars
         for i in range(len(race.cars)):
-            left, right = outputs[i][0], outputs[i][1]
-            race.cars[i].control(left, right)
+            left, right, gas, brake = outputs[i][0], outputs[i][1], outputs[i][2], outputs[i][3]
+            race.cars[i].control(left, right, gas, brake)
 
         # Start the cars
         if (race_started is False):
             race.start_race()
             race_started = True
 
-        # Periodically start race
-        race.game_tick()
+        # Periodically progress race
+        sensor_readings = race.game_tick()
         race.draw()
 
     # Process neural net inputs
-    pile.set_inputs([[random.random() for i in range(WIDTHS[0])]] * GROUP_SIZE)
+    pile.set_inputs(sensor_readings)
     pile.compute()
     outputs = pile.get_outputs()
-
-    # Need to produce outputs before we can start controlling cars
-    if (fresh is True):
-        fresh = False
 
     # Update the NN visualization
     pile.visual_update()
@@ -69,13 +66,33 @@ while(running):
     # Flip the display
     pygame.display.flip()
 
+    # Check if all cars are done or if next gen was forced
+    new_gen = race.all_stopped()
+    if (new_gen is True):
+        # get best genes
+        # ...
+
+        # make mutations of best genes
+        # ...
+
+        # reset cars
+        race.reset()
+
+        # start cars
+        race.start_race()
+
+
     # Did the user click the window close button?
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
     if running is True:
-        time.sleep(0.05)
+        time.sleep(0.01)
+
+    # Need to produce outputs before we can start controlling cars
+    if (fresh is True):
+        fresh = False
 
 # Done! Time to quit.
 pygame.quit()
