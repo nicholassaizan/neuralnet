@@ -75,7 +75,7 @@ while(running):
             running = False
 
     if running is True:
-        time.sleep(0.125)
+        time.sleep(0.05)
 
 # Done! Time to quit.
 pygame.quit()
