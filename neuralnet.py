@@ -96,6 +96,7 @@ class NeuralNet:
                 self.nodes[layer].append(Node())
 
     def __init_inputs__(self):
+        self.num_inputs = 0
         for layer in range(self.layers):
             # add a new sub-array for this layer
             self.inputs.append([])
@@ -112,6 +113,7 @@ class NeuralNet:
                 for j in range(next_width):
                     weight = get_init_weight(layer, self.layers)
                     self.inputs[layer][i].append(Input(weight))
+                    self.num_inputs += 1
 
     def set_inputs(self, inputs):
         if (len(inputs) != self.widths[0]):
@@ -299,21 +301,33 @@ class Pile():
                     for input_sub_id in range(len(our_inputs[layer][layer_sub_id])):
                         self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight = our_inputs[layer][layer_sub_id][input_sub_id].weight
 
-    def mutate_children(self, index):
+    def mutate_children(self, index, distance_from_solution):
         our_inputs = self.neural_nets[index].inputs
         for i in range(len(self.neural_nets)):
             # don't modify the parent
             if (i == index):
                 continue
 
-            # random select a weight to modify
-            layer = random.choice(range(len(our_inputs) - 1))
-            layer_sub_id = random.choice(range(len(our_inputs[layer])))
-            input_sub_id = random.choice(range(len(our_inputs[layer][layer_sub_id])))
+            # determine how probable mutations are based on number of inputs
+            num_mutations = self.neural_nets[index].num_inputs
 
-            # add a mutation to the weight
-            self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight = random.random()
+            # invoke mutations
+            for n in range(num_mutations):
+                # determine if we mutate
+                if (random.random() <= distance_from_solution):
+                    continue
 
-    def new_gen_from_fittest(self, index):
+                delta = random.uniform(-0.2, 0.2)
+
+                # random select a weight to modify
+                layer = random.choice(range(len(our_inputs) - 1))
+                layer_sub_id = random.choice(range(len(our_inputs[layer])))
+                input_sub_id = random.choice(range(len(our_inputs[layer][layer_sub_id])))
+
+                # add a mutation to the weight
+                weight = self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight + delta
+                self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight = np.clip(weight, 0, 1)
+
+    def new_gen_from_fittest(self, index, distance_from_solution):
         self.pass_on_genes(index)
-        self.mutate_children(index)
+        self.mutate_children(index, distance_from_solution)
