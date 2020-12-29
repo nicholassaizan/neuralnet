@@ -6,10 +6,10 @@ from cars import Race
 
 # Set NN parameters
 LAYERS = 3
-WIDTHS = (4, 5, 4)
+WIDTHS = (5, 6, 4)
 
 # Create NNs
-GROUP_SIZE = 5
+GROUP_SIZE = 6
 pile = Pile(GROUP_SIZE, LAYERS, WIDTHS)
 
 # Initialize pygame
@@ -39,7 +39,7 @@ while(running):
     screen.fill((30, 30, 30))
 
     # Application update
-    sensor_readings = [[0, 0, 0, 0]] * GROUP_SIZE
+    sensor_readings = [[0] * WIDTHS[0]] * GROUP_SIZE
     if (fresh is False):
         # Let neural nets control cars
         for i in range(len(race.cars)):
@@ -79,8 +79,13 @@ while(running):
         race.reset()
 
         # start cars
-        race.start_race()
+        race_started = False
 
+    
+
+    # Need to produce outputs before we can start controlling cars
+    if (fresh is True):
+        fresh = False
 
     # Did the user click the window close button?
     for event in pygame.event.get():
@@ -89,10 +94,6 @@ while(running):
 
     if running is True:
         time.sleep(0.01)
-
-    # Need to produce outputs before we can start controlling cars
-    if (fresh is True):
-        fresh = False
 
 # Done! Time to quit.
 pygame.quit()

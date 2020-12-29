@@ -7,7 +7,7 @@ PI = math.pi
 MAX_ANGULAR_VEL = 2*PI / 30
 MAX_VEL = 100
 MAX_ACCEL = 2
-MAX_BRAKE = 2
+MAX_BRAKE = 3
 
 
 class Car():
@@ -21,6 +21,8 @@ class Car():
         self.vel += ((MAX_ACCEL * self.gas) - (MAX_BRAKE * self.brake))
         if (self.vel > MAX_VEL):
             self.vel = MAX_VEL
+        if (self.vel < 0):
+            self.vel = 0
 
     def translate(self):
         if (self.stopped is False):
@@ -38,7 +40,7 @@ class Car():
     def tick(self):
         self.rotate()
         self.translate()
-        self.pedals
+        self.pedals()
 
     def control(self, left, right, gas, brake):
         self.left_command = left
@@ -269,8 +271,9 @@ class Race():
                 sensor_right = self.sensor_processing(self.sense_distance(pos, car.angle - PI/4))
 
             speed = car.vel / MAX_VEL
+            inverse_speed = 1 - speed
             
-            sensor_readings.append([sensor_left, sensor_middle, sensor_right, speed])
+            sensor_readings.append([sensor_left, sensor_middle, sensor_right, speed, inverse_speed])
 
         return sensor_readings
 
@@ -278,12 +281,13 @@ class Race():
         return math.e**(-1 * readings / 100)
 
     def sense_distance(self, pos, angle):
+        search_interval = 5
         distance = 0
         beam = [pos[0], pos[1]]
         while (self.on_track(beam) is True):
-            beam[0] += MAX_VEL * math.cos(angle)
-            beam[1] -= MAX_VEL * math.sin(angle)
-            distance += MAX_VEL
+            beam[0] += search_interval * math.cos(angle)
+            beam[1] -= search_interval * math.sin(angle)
+            distance += search_interval
         return distance
 
     def all_stopped(self):
