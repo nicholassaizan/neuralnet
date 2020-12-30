@@ -11,10 +11,10 @@ def text_objects(text, font):
     textSurface = font.render(text, True, white)
     return textSurface, textSurface.get_rect()
 
-def message_display(screen, text, x, y):
-    largeText = pygame.font.Font('freesansbold.ttf', 25)
+def message_display(screen, text, x, y, size):
+    largeText = pygame.font.Font('freesansbold.ttf', size)
     TextSurf, TextRect = text_objects(text, largeText)
-    TextRect.center = ((x/2), (y/2))
+    TextRect.center = (x, y)
     screen.blit(TextSurf, TextRect)
 
 
@@ -291,6 +291,28 @@ class NeuralNet:
         self.input_visual_update(status)
 
 
+class Slider():
+    def __init__(self, screen, pos):
+        self.screen = screen
+        self.pos = pos
+        self.width = 20
+        self.height = 200
+
+    def draw(self, value):
+        border_width = 2
+        border_rect = (self.pos[0]-self.width/2 - border_width, self.pos[1]-self.height/2 - border_width, self.width + border_width*2, self.height + border_width*2)
+        pygame.draw.rect(self.screen, (255, 255, 255), border_rect)
+
+        slider_back_rect = (self.pos[0]-self.width/2, self.pos[1]-self.height/2, self.width, self.height)
+        pygame.draw.rect(self.screen, (30, 30, 30), slider_back_rect)
+
+        slider_height = self.height*(1 - value)
+        slider_border = 2
+        slider_rect = (self.pos[0]-self.width/2 + slider_border, self.pos[1]-self.height/2+slider_height + slider_border, self.width - slider_border*2, self.height - slider_border * 2 - slider_height)
+        pygame.draw.rect(self.screen, (255, 255, 255), slider_rect)
+        message_display(self.screen, str(round(value, 2)), self.pos[0], self.pos[1] + self.height/2 + 10, 15)
+
+
 class Pile():
     def __init__(self, num_nn, layers, widths):
         self.gen_id = 0
@@ -302,6 +324,7 @@ class Pile():
 
     def visual_init(self, screen, num_visuals):
         self.screen = screen
+        self.slider = Slider(self.screen, (50, self.screen.get_height()/2))
         for visual_id in range(num_visuals):
             self.neural_nets[visual_id].visual_init(self.screen, visual_id, num_visuals)
 
@@ -309,7 +332,8 @@ class Pile():
         for i in range(len(self.neural_nets)):
             if (self.neural_nets[i].visual_initialized is True):
                 self.neural_nets[i].visual_update(statuses[i])
-        message_display(self.screen, 'generation: ' + str(self.gen_id), self.screen.get_width(), 100)
+        message_display(self.screen, 'generation: ' + str(self.gen_id), self.screen.get_width()/2, 50, 25)
+        self.slider.draw(self.mutation_multiplier)
 
     def set_inputs(self, inputs):
         for i in range(len(self.neural_nets)):
@@ -348,11 +372,11 @@ class Pile():
                 continue
 
             # determine how probable mutations are based on number of inputs
-            num_mutations = math.ceil(self.neural_nets[0].num_inputs) * self.multiplier
+            num_mutations = math.ceil(self.neural_nets[0].num_inputs * self.mutation_multiplier)
 
             # invoke mutations
             for n in range(num_mutations):
-                delta = random.uniform(-1, 1) * self.multiplier
+                delta = random.uniform(-1, 1) * self.mutation_multiplier
 
                 # random select a weight to modify
                 nn_inputs = self.neural_nets[i].inputs

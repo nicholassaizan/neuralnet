@@ -1,5 +1,6 @@
 import time
 import pygame
+import numpy as np
 from neuralnet import Pile
 from cars import Race
 
@@ -110,9 +111,9 @@ while(running):
             if event.key == pygame.K_SPACE:
                 force = True
             if event.key == pygame.K_UP:
-                pile.mutation_multiplier += 0.05
+                pile.mutation_multiplier = np.clip(pile.mutation_multiplier + 0.05, 0, 1)
             if event.key == pygame.K_DOWN:
-                pile.mutation_multiplier -= 0.05
+                pile.mutation_multiplier = np.clip(pile.mutation_multiplier - 0.05, 0, 1)
         mouse_click = pygame.mouse.get_pressed()
         if (mouse_click[0] is True):
             race.select_winner(pygame.mouse.get_pos())
