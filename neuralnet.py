@@ -18,7 +18,7 @@ def message_display(screen, text, x, y):
 
 
 def get_init_weight(layer_id, layers):
-    layer_multiplier = 1 - ((layer_id / layers)/3)
+    layer_multiplier = (1 - (layer_id / layers)) * 0.5
     return random.random() * layer_multiplier
 
 
@@ -320,13 +320,14 @@ class Pile():
 
     def mutate_children(self, index, distance_to_solution):
         our_inputs = self.neural_nets[index].inputs
+        every_other = False
         for i in range(len(self.neural_nets)):
             # don't modify the parent
             if (i == index):
                 continue
 
             # determine how probable mutations are based on number of inputs
-            num_mutations = self.neural_nets[index].num_inputs * 5
+            num_mutations = self.neural_nets[index].num_inputs
 
             # invoke mutations
             for n in range(num_mutations):
@@ -334,7 +335,10 @@ class Pile():
                 if (random.random() > distance_to_solution):
                     continue
 
-                delta = random.uniform(-0.1, 0.1)
+                if (every_other == False):
+                    delta = random.uniform(-0.01, 0.01)
+                else:
+                    delta = random.uniform(-0.1, 0.1)
 
                 # random select a weight to modify
                 layer = random.choice(range(len(our_inputs) - 1))
@@ -345,6 +349,11 @@ class Pile():
                 old_weight = self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight
                 weight = old_weight + delta
                 self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight = np.clip(weight, 0, 1)
+
+            if (every_other == False):
+                every_other = True
+            else:
+                every_other = False
 
         self.gen_id += 1
 

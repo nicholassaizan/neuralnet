@@ -272,15 +272,15 @@ class Race():
                 sensor_middle = self.sensor_processing(self.sense_distance(pos, car.angle))
                 sensor_right = self.sensor_processing(self.sense_distance(pos, car.angle - PI/4))
 
-            speed = car.vel / MAX_VEL
-            inverse_speed = 1 - speed
-            
+            speed = math.e**((car.vel / MAX_VEL - 100)/20)
+            inverse_speed = math.e**(-1*(speed)/20)
+
             sensor_readings.append([sensor_left, sensor_middle, sensor_right, speed, inverse_speed])
 
         return sensor_readings
 
     def sensor_processing(self, readings):
-        return math.e**(-1 * readings / 100)
+        return math.e**(-1 * readings / 500)
 
     def sense_distance(self, pos, angle):
         search_interval = 5
@@ -290,6 +290,20 @@ class Race():
             beam[0] += search_interval * math.cos(angle)
             beam[1] -= search_interval * math.sin(angle)
             distance += search_interval
+        return distance
+
+    def get_on_track_distance(self, index):
+        distance = self.cars[index].odometer
+        pos, angle = (self.cars[index].x, self.cars[index].y), self.cars[index].angle
+        timeout = 500
+        while (self.on_track(pos) is False):
+            if (timeout <= 0):
+                return 0
+            timeout -= 1
+            delta_x = -1 * math.cos(angle)
+            delta_y = -1 * math.sin(angle)
+            pos = (delta_x + pos[0], delta_y + pos[1])
+            distance -= 1
         return distance
 
     def all_stopped(self):
@@ -302,7 +316,7 @@ class Race():
 
     def get_fitness(self, index):
         x1, y1, x2, y2 = 5000, 0, 6000, 0.5
-        distance = self.cars[index].odometer
+        distance = self.get_on_track_distance(index)
         average_speed = self.cars[index].odometer/self.cars[index].ticks
         scaled_speed = distance / MAX_VEL * average_speed
         if (distance < x1):
