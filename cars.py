@@ -5,10 +5,10 @@ import numpy as np
 
 PI = math.pi
 
-MAX_ANGULAR_VEL = 2*PI / 30
-MAX_VEL = 100
-MAX_ACCEL = 2
-MAX_BRAKE = 2
+MAX_ANGULAR_VEL = 2*PI / 100
+MAX_VEL = 50
+MAX_ACCEL = 4
+MAX_BRAKE = 7
 
 
 class Car():
@@ -19,49 +19,58 @@ class Car():
         self.color = self.__get_rgb__(color)
 
     def pedals(self):
-        self.vel += ((MAX_ACCEL * self.gas) - (MAX_BRAKE * self.brake))
+        processed_command = (self.accel_command - 0.5) * 0.1
+
+        if (processed_command < 0):
+            self.vel += (MAX_BRAKE * processed_command)
+        else:
+            self.vel += (processed_command * (MAX_VEL - self.vel))
+
         if (self.vel > MAX_VEL):
             self.vel = MAX_VEL
-        if (self.vel < 0):
+        elif (self.vel < 0):
             self.vel = 0
 
-    def translate(self):
+    def move(self):
         if (self.stopped is False):
             delta_x = self.vel * math.cos(self.angle)
             delta_y = self.vel * math.sin(self.angle)
             self.x += delta_x
             self.y -= delta_y
+
+            processed_command = 2*(self.steer_command - 0.5) * MAX_ANGULAR_VEL
+            self.angle += self.steering_physics(processed_command)
+
             self.odometer += self.vel
 
-    def rotate(self):
-        if (self.stopped is False):
-            processed_left_command = 1/(1 + np.exp(5 * (-(self.left_command - 0.1))))
-            processed_right_command = 1/(1 + np.exp(5 * (-(self.right_command - 0.1))))
-            self.angle += MAX_ANGULAR_VEL * (processed_left_command - processed_right_command)
-            self.angle %= (2 * PI)
+    def steering_physics(self, command):
+        # Distance between axis (L) = 4m
+        L = 4
+        # Turning radius
+        turn_radius = L / (math.tan(command))
+        # Cars turns this amount
+        delta_angle = self.vel / turn_radius
+        return delta_angle
 
     def tick(self):
         self.ticks += 1
-        self.rotate()
-        self.translate()
+        self.move()
         self.pedals()
 
-    def control(self, left, right, gas, brake):
-        self.left_command = left
-        self.right_command = right
-        self.gas = gas
-        self.brake = brake
+    def control(self, steer, accel):
+        self.steer_command = steer
+        self.accel_command = accel
 
     def reset(self):
         self.x = self.start_pos[0]
         self.y = self.start_pos[1]
         self.vel = 0
         self.angle = 0
-        self.gas = 0
-        self.brake = 0
+        self.accel_command = 0.5
         self.odometer = 0
         self.stopped = True
         self.ticks = 0
+        self.winner = False
 
     def start(self):
         self.stopped = False
@@ -70,8 +79,11 @@ class Car():
         self.stopped = True
 
     def draw(self):
-        vehicle_width = 6
-        vehicle_length = 10
+        size_multiplier = 1
+        if (self.winner is True):
+            size_multiplier = 2
+        vehicle_width = 6 * size_multiplier
+        vehicle_length = 10 * size_multiplier
         left = self.x - (vehicle_width/2)
         top = self.y - (vehicle_length/2)
         rect = pygame.Rect(left, top, vehicle_width, vehicle_length)
@@ -215,6 +227,16 @@ class Track180Turn():
         pygame.draw.arc(self.screen, self.color, self.rect, self.start_angle, self.stop_angle, self.width)
 
 
+class Ray():
+    def __init__(self, screen, pos1, pos2):
+        self.screen = screen
+        self.pos1 = pos1
+        self.pos2 = pos2
+
+    def draw(self):
+        pygame.draw.line(self.screen, (150, 0, 0), self.pos1, self.pos2)
+
+
 class Race():
     def __init__(self, screen, num_cars):
         self.screen = screen
@@ -222,6 +244,7 @@ class Race():
         self.start_point = (self.screen.get_width()/2, self.screen.get_height()/2+150)
         self.cars = self.__spawn_cars__()
         self.track = self.__spawn_track__()
+        self.rays = []
 
     def __spawn_cars__(self):
         cars = []
@@ -287,14 +310,14 @@ class Race():
                 stopped[i] = True
             else:
                 s1 = self.sensor_processing(self.sense_distance(pos, car.angle + PI/2))
-                s2 = self.sensor_processing(self.sense_distance(pos, car.angle + PI/8))
+                s2 = self.sensor_processing(self.sense_distance(pos, car.angle + PI/4))
                 s3 = self.sensor_processing(self.sense_distance(pos, car.angle))
-                s4 = self.sensor_processing(self.sense_distance(pos, car.angle - PI/8))
+                s4 = self.sensor_processing(self.sense_distance(pos, car.angle - PI/4))
                 s5 = self.sensor_processing(self.sense_distance(pos, car.angle - PI/2))
 
             speed = math.e**((car.vel / MAX_VEL - 100)/20)
 
-            sensor_readings.append([s1, s2, s3, s4, s5, speed, 1])
+            sensor_readings.append([s1, s2, s3, s4, s5, speed])
 
         return sensor_readings, stopped
 
@@ -309,6 +332,7 @@ class Race():
             beam[0] += search_interval * math.cos(angle)
             beam[1] -= search_interval * math.sin(angle)
             distance += search_interval
+        self.rays.append(Ray(self.screen, pos, beam))
         return distance
 
     def get_on_track_distance(self, index):
@@ -334,7 +358,7 @@ class Race():
         return result
 
     def get_fitness(self, index):
-        x1, y1, x2, y2 = 5000, 0.01, 6000, 0.5
+        x1, y1, x2, y2 = 5000, 0, 6000, 0.5
         distance = self.get_on_track_distance(index)
         average_speed = self.cars[index].odometer/self.cars[index].ticks
         scaled_speed = distance / MAX_VEL * average_speed
@@ -365,6 +389,35 @@ class Race():
         dist = math.e**(-1 * fitness / 10000)
         return dist
 
+    def set_winner(self, index):
+        if (self.cars[index].winner is True):
+            self.cars[index].winner = False
+        else:
+            self.cars[index].winner = True
+
+    def select_winner(self, pos):
+        x1, y1 = pos[0], pos[1]
+        closest_dist = self.screen.get_width()
+        closest_index = 0
+        for car_id in range(len(self.cars)):
+            x2, y2 = self.cars[car_id].x, self.cars[car_id].y
+            dist = math.sqrt(math.pow(x2-x1, 2) + math.pow(y2-y1, 2))
+            if (dist < closest_dist):
+                closest_dist = dist
+                closest_index = car_id
+
+        self.set_winner(closest_index)
+
+        return closest_index
+
+    def get_winners(self):
+        winners = []
+        for car_id in range(len(self.cars)):
+            car = self.cars[car_id]
+            if (car.winner is True):
+                winners.append(car_id)
+        return winners
+
     def reset(self):
         for car in self.cars:
             car.reset()
@@ -372,5 +425,8 @@ class Race():
     def draw(self):
         for part in self.track:
             part.draw()
+        for ray in self.rays:
+            ray.draw()
+        self.rays = []
         for car in self.cars:
             car.draw()

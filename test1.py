@@ -1,5 +1,4 @@
 import time
-import random
 import pygame
 from neuralnet import Pile
 from cars import Race
@@ -18,10 +17,10 @@ def force_new_gen():
 
 # Set NN parameters
 LAYERS = 3
-WIDTHS = (7, 6, 4)
+WIDTHS = (6, 7, 2)
 
 # Create NNs
-GROUP_SIZE = 5
+GROUP_SIZE = 50
 pile = Pile(GROUP_SIZE, LAYERS, WIDTHS)
 
 # Initialize pygame
@@ -36,7 +35,7 @@ screen_height = screen_scale * screen_height_scale
 screen = pygame.display.set_mode([screen_width, screen_height])
 
 # Initialize NN visuals
-pile.visual_init(screen, GROUP_SIZE)
+pile.visual_init(screen, min(GROUP_SIZE, 7))
 
 # Initialize application
 race = Race(screen, GROUP_SIZE)
@@ -55,8 +54,8 @@ while(running):
     if (fresh is False):
         # Let neural nets control cars
         for i in range(len(race.cars)):
-            left, right, gas, brake = outputs[i][0], outputs[i][1], outputs[i][2], outputs[i][3]
-            race.cars[i].control(left, right, gas, brake)
+            steer, accel = outputs[i][0], outputs[i][1]
+            race.cars[i].control(steer, accel)
 
         # Start the cars
         if (race_started is False):
@@ -81,13 +80,17 @@ while(running):
 
     if (fresh is False):
         # Check if all cars are done or if next gen was forced
-        new_gen = (race.all_stopped() or force_new_gen())
+        new_gen = force_new_gen()
         if (new_gen is True):
             # get best genes
-            fittest_car_index, distance_to_solution = race.get_fittest()
+            fittest_car_index = race.get_fittest()[0]
+            fittest_indeces = race.get_winners()
+
+            if (fittest_indeces == []):
+                fittest_indeces.append(fittest_car_index)
 
             # make mutations of best genes
-            pile.new_gen_from_fittest(fittest_car_index, distance_to_solution)
+            pile.new_gen_from_fittest(fittest_indeces)
 
             # reset cars
             race.reset()
@@ -106,6 +109,13 @@ while(running):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 force = True
+            if event.key == pygame.K_UP:
+                pile.mutation_multiplier += 0.05
+            if event.key == pygame.K_DOWN:
+                pile.mutation_multiplier -= 0.05
+        mouse_click = pygame.mouse.get_pressed()
+        if (mouse_click[0] is True):
+            race.select_winner(pygame.mouse.get_pos())
 
     if running is True:
         time.sleep(0.01)

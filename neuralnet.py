@@ -12,15 +12,16 @@ def text_objects(text, font):
     return textSurface, textSurface.get_rect()
 
 def message_display(screen, text, x, y):
-    largeText = pygame.font.Font('freesansbold.ttf', 50)
+    largeText = pygame.font.Font('freesansbold.ttf', 25)
     TextSurf, TextRect = text_objects(text, largeText)
     TextRect.center = ((x/2), (y/2))
     screen.blit(TextSurf, TextRect)
 
 
 def get_init_weight(layer_id, layers):
-    layer_multiplier = (1 - (layer_id / layers)) * 0.33
-    return random.random() * layer_multiplier
+    layer_multiplier = (1 - (layer_id / layers))
+    weight = random.uniform(-1, 1) * layer_multiplier
+    return weight
 
 
 class Circle():
@@ -32,7 +33,7 @@ class Circle():
 
     def draw(self, value, status):
         if (status is True):
-            color = (100, 0, 0)
+            color = (10, 10, 10)
         elif (value > 0.5):
             color = (0, 255, 0)
         else:
@@ -49,7 +50,12 @@ class Line():
 
     def draw(self, value, status):
         if (status is True):
-            color = (50, 0, 0)
+            color = (0, 0, 0)
+        elif (value < 0):
+            r = 100 + (-value * 155)
+            g = (1 + value) * 100
+            b = (1 + value) * 100
+            color = (r, g, b)
         else:
             r = (1 - value) * 100
             g = 100 + (value * 155)
@@ -105,6 +111,8 @@ class NeuralNet:
 
         # Initialize misc variables
         self.nn_input_args = [0 for x in range(widths[0])]
+
+        self.visual_initialized = False
 
     def __init_nodes__(self):
         for layer in range(self.layers):
@@ -197,6 +205,8 @@ class NeuralNet:
         self.node_visual_init()
         self.input_visual_init()
 
+        self.visual_initialized = True
+
         # new thread for pygame
         # thread = threading.Thread(target=self.pygame_thread)
         # thread.start()
@@ -288,6 +298,7 @@ class Pile():
         self.layers = layers
         self.widths = widths
         self.neural_nets = [NeuralNet(self.layers, self.widths) for i in range(num_nn)]
+        self.mutation_multiplier = 0.1
 
     def visual_init(self, screen, num_visuals):
         self.screen = screen
@@ -296,8 +307,9 @@ class Pile():
 
     def visual_update(self, statuses):
         for i in range(len(self.neural_nets)):
-            self.neural_nets[i].visual_update(statuses[i])
-        message_display(self.screen, 'generation: ' + str(self.gen_id), self.screen.get_width()/2, 100)
+            if (self.neural_nets[i].visual_initialized is True):
+                self.neural_nets[i].visual_update(statuses[i])
+        message_display(self.screen, 'generation: ' + str(self.gen_id), self.screen.get_width(), 100)
 
     def set_inputs(self, inputs):
         for i in range(len(self.neural_nets)):
@@ -311,60 +323,50 @@ class Pile():
         outputs = [nn.get_outputs() for nn in self.neural_nets]
         return outputs
 
-    def pass_on_genes(self, index):
-        our_inputs = self.neural_nets[index].inputs
+    def pass_on_genes(self, indeces):
         for i in range(len(self.neural_nets)):
             # don't need to copy to the parent
-            if (i == index):
+            if (i in indeces):
                 continue
 
-            # copy weights from parent to child
-            for layer in range(len(our_inputs)):
-                for layer_sub_id in range(len(our_inputs[layer])):
-                    for input_sub_id in range(len(our_inputs[layer][layer_sub_id])):
-                        self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight = our_inputs[layer][layer_sub_id][input_sub_id].weight
+            # copy weights from parents to child
+            child_inputs = self.neural_nets[i].inputs
+            for layer in range(len(child_inputs)):
+                for layer_sub_id in range(len(child_inputs[layer])):
+                    for input_sub_id in range(len(child_inputs[layer][layer_sub_id])):
+                        # randomly select which parent to copy from
+                        index = random.choice(indeces)
+                        parent_inputs = self.neural_nets[index].inputs
 
-    def mutate_children(self, index, distance_to_solution):
-        our_inputs = self.neural_nets[index].inputs
-        #heavy_mutation = 4
+                        # copy gene from parent
+                        self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight = parent_inputs[layer][layer_sub_id][input_sub_id].weight
+
+    def mutate_children(self, indeces):
         for i in range(len(self.neural_nets)):
             # don't modify the parent
-            if (i == index):
+            if (i in indeces):
                 continue
 
             # determine how probable mutations are based on number of inputs
-            num_mutations = math.ceil(self.neural_nets[index].num_inputs / 3)
+            num_mutations = math.ceil(self.neural_nets[0].num_inputs) * self.multiplier
 
             # invoke mutations
             for n in range(num_mutations):
-                # determine if we mutate
-                if (random.random() > distance_to_solution):
-                    continue
-
-                #if (heavy_mutation == 0):
-                #    delta = random.uniform(-0.1, 0.1) * distance_to_solution
-                #else:
-                #    delta = random.uniform(-0.05, 0.05) * distance_to_solution
-
-                delta = random.uniform(-0.1, 0.1) * distance_to_solution
+                delta = random.uniform(-1, 1) * self.multiplier
 
                 # random select a weight to modify
-                layer = random.choice(range(len(our_inputs) - 1))
-                layer_sub_id = random.choice(range(len(our_inputs[layer])))
-                input_sub_id = random.choice(range(len(our_inputs[layer][layer_sub_id])))
+                nn_inputs = self.neural_nets[i].inputs
+                layer = random.choice(range(len(nn_inputs) - 1))
+                layer_sub_id = random.choice(range(len(nn_inputs[layer])))
+                input_sub_id = random.choice(range(len(nn_inputs[layer][layer_sub_id])))
 
                 # add a mutation to the weight
                 old_weight = self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight
                 weight = old_weight + delta
-                self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight = np.clip(weight, 0, 1)
-
-            #if (heavy_mutation == 0):
-            #    heavy_mutation = 4
-            #else:
-            #    heavy_mutation -= 1
+                self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight = np.clip(weight, -1, 1)
 
         self.gen_id += 1
 
-    def new_gen_from_fittest(self, index, distance_to_solution):
-        self.pass_on_genes(index)
-        self.mutate_children(index, distance_to_solution)
+    def new_gen_from_fittest(self, indeces):
+        self.pass_on_genes(indeces)
+        self.mutate_children(indeces)
