@@ -1,6 +1,7 @@
 import pygame
 import numpy as np
 import random
+import math
 
 
 white = (255, 255, 255)
@@ -11,14 +12,14 @@ def text_objects(text, font):
     return textSurface, textSurface.get_rect()
 
 def message_display(screen, text, x, y):
-    largeText = pygame.font.Font('freesansbold.ttf',50)
+    largeText = pygame.font.Font('freesansbold.ttf', 50)
     TextSurf, TextRect = text_objects(text, largeText)
-    TextRect.center = ((x/2),(y/2))
+    TextRect.center = ((x/2), (y/2))
     screen.blit(TextSurf, TextRect)
 
 
 def get_init_weight(layer_id, layers):
-    layer_multiplier = (1 - (layer_id / layers)) * 0.5
+    layer_multiplier = (1 - (layer_id / layers)) * 0.33
     return random.random() * layer_multiplier
 
 
@@ -29,8 +30,10 @@ class Circle():
         self.y = y
         self.radius = radius
 
-    def draw(self, value):
-        if (value > 0.5):
+    def draw(self, value, status):
+        if (status is True):
+            color = (100, 0, 0)
+        elif (value > 0.5):
             color = (0, 255, 0)
         else:
             color = (255, 255, 255)
@@ -44,11 +47,14 @@ class Line():
         self.pos2 = pos2
         self.width = width
 
-    def draw(self, value):
-        r = (1 - value) * 100
-        g = 100 + (value * 155)
-        b = (1 - value) * 100
-        color = (r, g, b)
+    def draw(self, value, status):
+        if (status is True):
+            color = (50, 0, 0)
+        else:
+            r = (1 - value) * 100
+            g = 100 + (value * 155)
+            b = (1 - value) * 100
+            color = (r, g, b)
         pygame.draw.line(self.screen, color, self.pos1, self.pos2, self.width)
 
 
@@ -255,24 +261,24 @@ class NeuralNet:
                     x2_pos -= node_radius
                     self.inputs[i][j][k].visualization = Line(self.screen, (x1_pos, y1_pos), (x2_pos, y2_pos), 2)
 
-    def node_visual_update(self):
+    def node_visual_update(self, status):
         for i in range(len(self.nodes)):
             for j in range(len(self.nodes[i])):
                 if (self.nodes[i][j].visualization is not None):
                     value = self.nodes[i][j].output
-                    self.nodes[i][j].visualization.draw(value)
+                    self.nodes[i][j].visualization.draw(value, status)
 
-    def input_visual_update(self):
+    def input_visual_update(self, status):
         for i in range(len(self.inputs)):
             for j in range(len(self.inputs[i])):
                 for k in range(len(self.inputs[i][j])):
                     if (self.inputs[i][j][k].visualization is not None):
                         value = self.inputs[i][j][k].weighted_value
-                        self.inputs[i][j][k].visualization.draw(value)
+                        self.inputs[i][j][k].visualization.draw(value, status)
 
-    def visual_update(self):
-        self.node_visual_update()
-        self.input_visual_update()
+    def visual_update(self, status):
+        self.node_visual_update(status)
+        self.input_visual_update(status)
 
 
 class Pile():
@@ -288,9 +294,9 @@ class Pile():
         for visual_id in range(num_visuals):
             self.neural_nets[visual_id].visual_init(self.screen, visual_id, num_visuals)
 
-    def visual_update(self):
-        for neural_net in self.neural_nets:
-            neural_net.visual_update()
+    def visual_update(self, statuses):
+        for i in range(len(self.neural_nets)):
+            self.neural_nets[i].visual_update(statuses[i])
         message_display(self.screen, 'generation: ' + str(self.gen_id), self.screen.get_width()/2, 100)
 
     def set_inputs(self, inputs):
@@ -320,14 +326,14 @@ class Pile():
 
     def mutate_children(self, index, distance_to_solution):
         our_inputs = self.neural_nets[index].inputs
-        every_other = False
+        #heavy_mutation = 4
         for i in range(len(self.neural_nets)):
             # don't modify the parent
             if (i == index):
                 continue
 
             # determine how probable mutations are based on number of inputs
-            num_mutations = self.neural_nets[index].num_inputs
+            num_mutations = math.ceil(self.neural_nets[index].num_inputs / 3)
 
             # invoke mutations
             for n in range(num_mutations):
@@ -335,10 +341,12 @@ class Pile():
                 if (random.random() > distance_to_solution):
                     continue
 
-                if (every_other == False):
-                    delta = random.uniform(-0.01, 0.01)
-                else:
-                    delta = random.uniform(-0.1, 0.1)
+                #if (heavy_mutation == 0):
+                #    delta = random.uniform(-0.1, 0.1) * distance_to_solution
+                #else:
+                #    delta = random.uniform(-0.05, 0.05) * distance_to_solution
+
+                delta = random.uniform(-0.1, 0.1) * distance_to_solution
 
                 # random select a weight to modify
                 layer = random.choice(range(len(our_inputs) - 1))
@@ -350,10 +358,10 @@ class Pile():
                 weight = old_weight + delta
                 self.neural_nets[i].inputs[layer][layer_sub_id][input_sub_id].weight = np.clip(weight, 0, 1)
 
-            if (every_other == False):
-                every_other = True
-            else:
-                every_other = False
+            #if (heavy_mutation == 0):
+            #    heavy_mutation = 4
+            #else:
+            #    heavy_mutation -= 1
 
         self.gen_id += 1
 

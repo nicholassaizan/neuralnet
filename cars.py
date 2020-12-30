@@ -1,6 +1,7 @@
 import random
 import math
 import pygame
+import numpy as np
 
 PI = math.pi
 
@@ -34,7 +35,9 @@ class Car():
 
     def rotate(self):
         if (self.stopped is False):
-            self.angle += MAX_ANGULAR_VEL * (self.left_command - self.right_command)
+            processed_left_command = 1/(1 + np.exp(5 * (-(self.left_command - 0.1))))
+            processed_right_command = 1/(1 + np.exp(5 * (-(self.right_command - 0.1))))
+            self.angle += MAX_ANGULAR_VEL * (processed_left_command - processed_right_command)
             self.angle %= (2 * PI)
 
     def tick(self):
@@ -253,31 +256,47 @@ class Race():
                 result = True
         return result
 
+    def timeout(self, distance, ticks):
+        if (ticks > 100):
+            if (ticks > 500):
+                if (distance <= 10):
+                    return True
+            if (distance <= 1):
+                return True
+        return False
+
     def start_race(self):
         for car in self.cars:
             car.start()
 
     def game_tick(self):
         sensor_readings = []
-        for car in self.cars:
+        stopped = [False] * len(self.cars)
+        for i in range(len(self.cars)):
+            car = self.cars[i]
             car.tick()
             pos = (car.x, car.y)
 
-            sensor_left, sensor_middle, sensor_right = 0, 0, 0
+            s1, s2, s3, s4, s5, = 0, 0, 0, 0, 0
 
             if (self.on_track(pos) is False):
                 car.stop()
+                stopped[i] = True
+            elif (self.timeout(car.odometer, car.ticks) is True):
+                car.stop()
+                stopped[i] = True
             else:
-                sensor_left = self.sensor_processing(self.sense_distance(pos, car.angle + PI/4))
-                sensor_middle = self.sensor_processing(self.sense_distance(pos, car.angle))
-                sensor_right = self.sensor_processing(self.sense_distance(pos, car.angle - PI/4))
+                s1 = self.sensor_processing(self.sense_distance(pos, car.angle + PI/2))
+                s2 = self.sensor_processing(self.sense_distance(pos, car.angle + PI/8))
+                s3 = self.sensor_processing(self.sense_distance(pos, car.angle))
+                s4 = self.sensor_processing(self.sense_distance(pos, car.angle - PI/8))
+                s5 = self.sensor_processing(self.sense_distance(pos, car.angle - PI/2))
 
             speed = math.e**((car.vel / MAX_VEL - 100)/20)
-            inverse_speed = math.e**(-1*(speed)/20)
 
-            sensor_readings.append([sensor_left, sensor_middle, sensor_right, speed, inverse_speed])
+            sensor_readings.append([s1, s2, s3, s4, s5, speed, 1])
 
-        return sensor_readings
+        return sensor_readings, stopped
 
     def sensor_processing(self, readings):
         return math.e**(-1 * readings / 500)
@@ -315,7 +334,7 @@ class Race():
         return result
 
     def get_fitness(self, index):
-        x1, y1, x2, y2 = 5000, 0, 6000, 0.5
+        x1, y1, x2, y2 = 5000, 0.01, 6000, 0.5
         distance = self.get_on_track_distance(index)
         average_speed = self.cars[index].odometer/self.cars[index].ticks
         scaled_speed = distance / MAX_VEL * average_speed

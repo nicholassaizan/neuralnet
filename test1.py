@@ -18,10 +18,10 @@ def force_new_gen():
 
 # Set NN parameters
 LAYERS = 3
-WIDTHS = (5, 6, 4)
+WIDTHS = (7, 6, 4)
 
 # Create NNs
-GROUP_SIZE = 15
+GROUP_SIZE = 5
 pile = Pile(GROUP_SIZE, LAYERS, WIDTHS)
 
 # Initialize pygame
@@ -64,7 +64,7 @@ while(running):
             race_started = True
 
         # Periodically progress race
-        sensor_readings = race.game_tick()
+        sensor_readings, stopped_cars = race.game_tick()
         race.draw()
 
     # Process neural net inputs
@@ -72,8 +72,9 @@ while(running):
     pile.compute()
     outputs = pile.get_outputs()
 
-    # Update the NN visualization
-    pile.visual_update()
+    if (fresh is False):
+        # Update the NN visualization
+        pile.visual_update(stopped_cars)
 
     # Flip the display
     pygame.display.flip()
