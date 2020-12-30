@@ -21,7 +21,7 @@ LAYERS = 3
 WIDTHS = (6, 7, 2)
 
 # Create NNs
-GROUP_SIZE = 50
+GROUP_SIZE = 25
 pile = Pile(GROUP_SIZE, LAYERS, WIDTHS)
 
 # Initialize pygame

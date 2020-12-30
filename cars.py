@@ -5,7 +5,7 @@ import numpy as np
 
 PI = math.pi
 
-MAX_ANGULAR_VEL = 2*PI / 100
+MAX_ANGULAR_VEL = 2*PI / 200
 MAX_VEL = 50
 MAX_ACCEL = 4
 MAX_BRAKE = 7
@@ -31,30 +31,30 @@ class Car():
         elif (self.vel < 0):
             self.vel = 0
 
-    def move(self):
+    def move(self, time_scale):
         if (self.stopped is False):
-            delta_x = self.vel * math.cos(self.angle)
-            delta_y = self.vel * math.sin(self.angle)
+            delta_x = self.vel * math.cos(self.angle) * time_scale
+            delta_y = self.vel * math.sin(self.angle) * time_scale
             self.x += delta_x
             self.y -= delta_y
 
             processed_command = 2*(self.steer_command - 0.5) * MAX_ANGULAR_VEL
-            self.angle += self.steering_physics(processed_command)
+            self.angle += self.steering_physics(processed_command, time_scale)
 
             self.odometer += self.vel
 
-    def steering_physics(self, command):
+    def steering_physics(self, command, time_scale):
         # Distance between axis (L) = 4m
         L = 4
         # Turning radius
         turn_radius = L / (math.tan(command))
         # Cars turns this amount
-        delta_angle = self.vel / turn_radius
+        delta_angle = self.vel * time_scale / turn_radius
         return delta_angle
 
-    def tick(self):
+    def tick(self, time_scale):
         self.ticks += 1
-        self.move()
+        self.move(time_scale)
         self.pedals()
 
     def control(self, steer, accel):
@@ -245,6 +245,7 @@ class Race():
         self.cars = self.__spawn_cars__()
         self.track = self.__spawn_track__()
         self.rays = []
+        self.time_scale = 0.5
 
     def __spawn_cars__(self):
         cars = []
@@ -297,7 +298,7 @@ class Race():
         stopped = [False] * len(self.cars)
         for i in range(len(self.cars)):
             car = self.cars[i]
-            car.tick()
+            car.tick(self.time_scale)
             pos = (car.x, car.y)
 
             s1, s2, s3, s4, s5, = 0, 0, 0, 0, 0
@@ -322,7 +323,7 @@ class Race():
         return sensor_readings, stopped
 
     def sensor_processing(self, readings):
-        return math.e**(-1 * readings / 500)
+        return math.e**(-1 * readings / 100)
 
     def sense_distance(self, pos, angle):
         search_interval = 5
