@@ -3,6 +3,7 @@ import pygame
 import numpy as np
 from neuralnet import Pile
 from cars import Race
+from neuralnet import message_display
 
 
 force = False
@@ -17,8 +18,8 @@ def force_new_gen():
 
 
 # Set NN parameters
-LAYERS = 3
-WIDTHS = (6, 7, 2)
+LAYERS = 7
+WIDTHS = (6, 6, 6, 6, 6, 6, 2)
 
 # Create NNs
 GROUP_SIZE = 25
@@ -39,13 +40,16 @@ screen = pygame.display.set_mode([screen_width, screen_height])
 pile.visual_init(screen, min(GROUP_SIZE, 7))
 
 # Initialize application
-race = Race(screen, GROUP_SIZE)
+TRACK_NUM = 2
+TIME_SCALE = 0.5
+race = Race(screen, GROUP_SIZE, TRACK_NUM, time_scale=TIME_SCALE)
 
 fresh = True
 race_started = False
 
 # Run until the user asks to quit
 running = True
+outputs = [[]]
 while(running):
     # Fill the background with grey
     screen.fill((30, 30, 30))
@@ -75,6 +79,12 @@ while(running):
     if (fresh is False):
         # Update the NN visualization
         pile.visual_update(stopped_cars)
+
+    # Display application controls
+    message_display(screen, 'next generation: <SPACE>', 90, 20, 12)
+    message_display(screen, 'select parents: <MOUSE_1>', 93, 34, 12)
+    message_display(screen, 'increase mutations: <UP>', 88, 48, 12)
+    message_display(screen, 'decrease mutations: <DOWN>', 100, 62, 12)
 
     # Flip the display
     pygame.display.flip()
@@ -119,7 +129,7 @@ while(running):
             race.select_winner(pygame.mouse.get_pos())
 
     if running is True:
-        time.sleep(0.01)
+        time.sleep(0.033)
 
 # Done! Time to quit.
 pygame.quit()

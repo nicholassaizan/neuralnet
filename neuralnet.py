@@ -11,6 +11,7 @@ def text_objects(text, font):
     textSurface = font.render(text, True, white)
     return textSurface, textSurface.get_rect()
 
+
 def message_display(screen, text, x, y, size):
     largeText = pygame.font.Font('freesansbold.ttf', size)
     TextSurf, TextRect = text_objects(text, largeText)
@@ -85,7 +86,7 @@ class Node:
         self.visualization = None
 
     def compute(self, input_sum):
-        self.output = 1/(1 + np.exp(50 * (-(input_sum - 0.5))))
+        self.output = 1/(1 + np.exp(10 * (-(input_sum - 0.5))))
         return self.output
 
 

@@ -5,10 +5,10 @@ import numpy as np
 
 PI = math.pi
 
-MAX_ANGULAR_VEL = 2*PI / 200
-MAX_VEL = 50
-MAX_ACCEL = 4
-MAX_BRAKE = 7
+MAX_ANGULAR_VEL = 2*PI / 100
+MAX_VEL = 100
+MAX_ACCEL = 10
+MAX_BRAKE = 20
 
 
 class Car():
@@ -24,7 +24,7 @@ class Car():
         if (processed_command < 0):
             self.vel += (MAX_BRAKE * processed_command)
         else:
-            self.vel += (processed_command * (MAX_VEL - self.vel))
+            self.vel += (MAX_ACCEL * processed_command * (1 - (self.vel / MAX_VEL)))
 
         if (self.vel > MAX_VEL):
             self.vel = MAX_VEL
@@ -46,10 +46,20 @@ class Car():
     def steering_physics(self, command, time_scale):
         # Distance between axis (L) = 4m
         L = 4
+
         # Turning radius
         turn_radius = L / (math.tan(command))
+
         # Cars turns this amount
         delta_angle = self.vel * time_scale / turn_radius
+
+        # Centripedal force
+        mass = 1000
+        force = mass * self.vel**2 / turn_radius
+        force_ratio = force / (mass * MAX_VEL**2 / turn_radius)
+        slip_ratio = np.clip(force_ratio * 2.5, 0, 0.75)
+        delta_angle *= (1-slip_ratio)
+
         return delta_angle
 
     def tick(self, time_scale):
@@ -67,6 +77,7 @@ class Car():
         self.vel = 0
         self.angle = 0
         self.accel_command = 0.5
+        self.steer_command = 0.5
         self.odometer = 0
         self.stopped = True
         self.ticks = 0
@@ -238,14 +249,13 @@ class Ray():
 
 
 class Race():
-    def __init__(self, screen, num_cars):
+    def __init__(self, screen, num_cars, track_num, time_scale=1):
         self.screen = screen
         self.num_cars = num_cars
-        self.start_point = (self.screen.get_width()/2, self.screen.get_height()/2+150)
+        self.track = self.__spawn_track__(track_num)
         self.cars = self.__spawn_cars__()
-        self.track = self.__spawn_track__()
         self.rays = []
-        self.time_scale = 0.5
+        self.time_scale = time_scale
 
     def __spawn_cars__(self):
         cars = []
@@ -255,23 +265,27 @@ class Race():
             cars.append(Car(self.screen, color, self.start_point))
         return cars
 
-    def __track_turns__(self):
-        turns = []
-        turns.append(Track180Turn(self.screen, (self.screen.get_width()/4, self.screen.get_height()/2), 100, 200, 'w'))
-        turns.append(Track180Turn(self.screen, (self.screen.get_width()*3/4, self.screen.get_height()/2), 100, 200, 'e'))
-        return turns
-
-    def __track_straights__(self):
-        straights = []
-        straights.append(TrackStraight(self.screen, (self.screen.get_width()/4, self.screen.get_height()/2-200), (self.screen.get_width()*3/4, self.screen.get_height()/2-100)))
-        straights.append(TrackStraight(self.screen, (self.screen.get_width()/4, self.screen.get_height()/2+100), (self.screen.get_width()*3/4, self.screen.get_height()/2+200)))
-        return straights
-
-    def __spawn_track__(self):
-        track = []
-        track += self.__track_turns__()
-        track += self.__track_straights__()
-        return track
+    def __spawn_track__(self, track_num):
+        width, height = self.screen.get_width(), self.screen.get_height()
+        parts = []
+        if (track_num == 1):
+            parts.append(Track180Turn(self.screen, (width/4, height/2), 100, 200, 'w'))
+            parts.append(Track180Turn(self.screen, (width*3/4, height/2), 100, 200, 'e'))
+            parts.append(TrackStraight(self.screen, (width/4, height/2-200), (width*3/4, height/2-100)))
+            parts.append(TrackStraight(self.screen, (width/4, height/2+100), (width*3/4, height/2+200)))
+            self.start_point = (width/2, height/2+150)
+        elif (track_num == 2):
+            parts.append(Track180Turn(self.screen, (300, 300), 100, 200, 'n'))
+            parts.append(Track180Turn(self.screen, (600, 300), 100, 200, 's'))
+            parts.append(Track90Turn(self.screen, (900, 300), 100, 200, 'nw'))
+            parts.append(TrackStraight(self.screen, (900, 100), (1100, 200)))
+            parts.append(Track90Turn(self.screen, (1100, 500), 300, 400, 'ne'))
+            parts.append(Track90Turn(self.screen, (1300, 500), 100, 200, 'se'))
+            parts.append(TrackStraight(self.screen, (300, 600), (1300, 700)))
+            parts.append(Track90Turn(self.screen, (300, 500), 100, 200, 'sw'))
+            parts.append(TrackStraight(self.screen, (100, 300), (200, 500)))
+            self.start_point = (300, 150)
+        return parts
 
     def on_track(self, pos):
         result = False
@@ -310,20 +324,20 @@ class Race():
                 car.stop()
                 stopped[i] = True
             else:
-                s1 = self.sensor_processing(self.sense_distance(pos, car.angle + PI/2))
-                s2 = self.sensor_processing(self.sense_distance(pos, car.angle + PI/4))
-                s3 = self.sensor_processing(self.sense_distance(pos, car.angle))
-                s4 = self.sensor_processing(self.sense_distance(pos, car.angle - PI/4))
-                s5 = self.sensor_processing(self.sense_distance(pos, car.angle - PI/2))
+                s1 = self.sensor_processing(self.sense_distance(pos, car.angle + PI/2), 100)
+                s2 = self.sensor_processing(self.sense_distance(pos, car.angle + PI/4), 150)
+                s3 = self.sensor_processing(self.sense_distance(pos, car.angle), 300)
+                s4 = self.sensor_processing(self.sense_distance(pos, car.angle - PI/4), 150)
+                s5 = self.sensor_processing(self.sense_distance(pos, car.angle - PI/2), 150)
 
-            speed = math.e**((car.vel / MAX_VEL - 100)/20)
+            speed = 1 - math.e**(-15 * car.vel / MAX_VEL)
 
             sensor_readings.append([s1, s2, s3, s4, s5, speed])
 
         return sensor_readings, stopped
 
-    def sensor_processing(self, readings):
-        return math.e**(-1 * readings / 100)
+    def sensor_processing(self, readings, distance_scaler):
+        return math.e**(-1 * readings / distance_scaler)
 
     def sense_distance(self, pos, angle):
         search_interval = 5
@@ -333,7 +347,7 @@ class Race():
             beam[0] += search_interval * math.cos(angle)
             beam[1] -= search_interval * math.sin(angle)
             distance += search_interval
-        self.rays.append(Ray(self.screen, pos, beam))
+        #self.rays.append(Ray(self.screen, pos, beam))
         return distance
 
     def get_on_track_distance(self, index):
@@ -359,20 +373,8 @@ class Race():
         return result
 
     def get_fitness(self, index):
-        x1, y1, x2, y2 = 5000, 0, 6000, 0.5
         distance = self.get_on_track_distance(index)
-        average_speed = self.cars[index].odometer/self.cars[index].ticks
-        scaled_speed = distance / MAX_VEL * average_speed
-        if (distance < x1):
-            fitness = distance * (1 - y1) + scaled_speed * y1
-        elif ((distance >= x1) and (distance <= x2)):
-            m = (y2 - y1)/(x2 - x1)
-            b = (y2 - y1*x2/x1)/(1 - x2)
-            f = lambda x, m, b: m*x + b
-            fitness = distance * (1 - f(distance, m, b)) + scaled_speed * f(distance, m, b)
-        else:
-            fitness = distance * 0.5 + scaled_speed * 0.5
-        return fitness
+        return distance
 
     def get_fittest(self):
         best_fitness = 0
